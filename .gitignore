@@ -1,0 +1,8 @@
+*.ex5
+*.ex4
+*.obj
+**/logs/
+**/*.log
+.vscode/
+.idea/
+build_log.txt
