@@ -29,7 +29,7 @@ Automatically manages stop losses for your manually opened trades with these fea
 
 1. In MetaTrader 5, open the Navigator panel (Ctrl+N)
 2. Find "Abhis_EAs" under "Expert Advisors"
-3. Double-click "Auto_SL_EA" to add it to your chart
+3. Double-click "Auto_SL" to add it to your chart
 4. Configure the settings:
 
    - FixedSLPips: Initial stop loss distance (default: 20 pips)
@@ -48,23 +48,82 @@ Automatically manages stop losses for your manually opened trades with these fea
 ### Prerequisites
 
 1. Install Visual Studio Code
-2. Install MetaTrader 5
-3. Install Git (optional, for version control)
+2. Install these VS Code extensions:
+   - MQL Tools
+   - Run on Save (emeraldwalk.RunOnSave)
+3. Install MetaTrader 5 terminal(s)
+4. Install Git (for version control)
 
 ### Development Environment Setup
 
-1. Clone or download this repository
-2. Open Command Prompt as Administrator
-3. Navigate to your repository folder
-4. Run `autobuild.bat` to enable auto-compilation
+1. Clone this repository:
+
+   ```bash
+   git clone https://github.com/yourusername/metatrader5-utilities.git
+   cd metatrader5-utilities
+   ```
+
+2. Update VS Code configuration:
+
+   - Open `.vscode/c_cpp_properties.json`
+   - Update the terminal IDs in `includePath` for your MT5 installations
+   - Update the `compilerPath` to your MetaEditor location
+
+3. Update compile.bat:
+   - Open `compile.bat`
+   - Update paths for your MT5 terminal(s)
+   - Paths should match your MetaEditor installations
 
 ### Making Changes
 
-1. Open the project folder in VS Code
-2. Make changes to any .mq5 file
-3. Save your changes
-4. The watch script will automatically compile
-5. Changes appear instantly in MetaTrader 5
+1. Open the project in VS Code
+2. Modify any .mq5 file
+3. Changes auto-compile on save
+4. Updates appear instantly in MT5
+
+### File Structure
+
+```
+metatrader5-utilities/
+├── .vscode/                     # VS Code configuration
+├── Experts/
+│   └── Abhis_EAs/              # Expert Advisors
+├── Include/
+│   └── Abhis_Include/          # Custom include files
+├── Indicators/
+│   └── Abhis_Indicators/       # Custom indicators
+├── Scripts/
+│   └── Abhis_Scripts/          # Utility scripts
+├── compile.bat                  # Multi-terminal compiler
+└── README.md
+```
+
+### Finding Your MT5 Terminal ID
+
+1. Open MT5
+2. Click File → Open Data Folder
+3. Look at the address bar
+4. The long alphanumeric string is your terminal ID
+   Example: `C:\Users\...\Terminal\49CDDEAA95A409ED22BD2287BB67CB9C\`
+
+### Troubleshooting
+
+1. Compilation not working?
+
+   - Check terminal IDs in c_cpp_properties.json
+   - Verify MetaEditor paths in compile.bat
+   - Ensure VS Code extensions are installed
+
+2. Changes not appearing in MT5?
+
+   - Check if compilation shows any errors
+   - Try restarting MT5
+   - Verify symbolic links are correct
+
+3. IntelliSense not working?
+   - Check paths in c_cpp_properties.json
+   - Reload VS Code window
+   - Reinstall MQL Tools extension
 
 ## 📊 EA Parameters Explained
 

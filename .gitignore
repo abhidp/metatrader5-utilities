@@ -6,3 +6,14 @@
 .vscode/
 .idea/
 build_log.txt
+# Build logs
+build_log.*.txt
+
+# Compiled files
+*.ex5
+
+# VS Code workspace settings
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.json
+!.vscode/c_cpp_properties.json
