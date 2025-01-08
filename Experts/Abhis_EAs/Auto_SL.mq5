@@ -14,13 +14,13 @@
 CTrade trade;
 
 // Input Parameters
-input double FixedSLPips = 20.0;       // Initial Stop Loss in pips
+input double FixedSLPips = 25.0;       // Initial Stop Loss in pips
 input bool UseATR = true;              // Use ATR for Stop Loss and Trailing
 input int ATRPeriod = 14;              // ATR Period
 input double ATRMultiplier = 2.0;      // ATR Multiplier for Initial Stop Loss
-input double TrailATRMultiplier = 1.0; // ATR Multiplier for Trailing Stop (lower than initial)
+input double TrailATRMultiplier = 1.5; // ATR Multiplier for Trailing Stop (lower than initial)
 input bool EnableTrailing = true;      // Enable Trailing Stop
-input int MinimumPips = 5;             // Minimum trailing distance in pips
+input int MinimumPips = 10;            // Minimum trailing distance in pips
 
 // Global Variables
 int ATRHandle;
