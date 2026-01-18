@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-Command AutoHotkey* -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(dir /b /ad \"C:\\\\Users\\\\abhid\\\\AppData\\\\Roaming\\\\MetaQuotes\\\\Terminal\"\")",
+      "Bash(cmd /c \"dir /b /ad C:\\\\Users\\\\abhid\\\\AppData\\\\Roaming\\\\MetaQuotes\\\\Terminal\\\\ 2>nul\")",
+      "Bash(compile.bat \"Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities && compile.bat Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\")",
+      "Bash(cmd /c \"type C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\build_log.vantage.txt\")",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell -Command \"Get-Content ''C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5'' | Select-Object -Skip 1426 -First 1\")",
+      "Bash(\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\compile.bat\" \"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\")"
+    ]
+  }
+}
