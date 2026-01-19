@@ -1,0 +1,9 @@
+  - Draggable entry/SL/TP lines with visual zones
+  - Interactive panel with editable fields that sync bidirectionally with lines
+  - PIPS/PRICE toggle for SL/TP display
+  - Clickable LONG/SHORT button to flip positions
+  - Smart order type detection (Limit vs Stop)
+  - R:R ratio controls with +/- adjustment
+  - XAU pip calculation handling
+  - Works on closed markets (the label positioning fix)
+  - Panel minimize, drag, and persistence
