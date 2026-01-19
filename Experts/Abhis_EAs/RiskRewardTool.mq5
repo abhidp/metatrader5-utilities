@@ -139,11 +139,19 @@ int OnInit()
         currentPanelY = PanelY;
     }
 
-    // Initialize dynamic risk value from input
-    currentRiskValue = RiskValue;
+    // Restore risk value from GlobalVariable or use default
+    string gvRiskValue = prefix + "RiskValue";
+    if (GlobalVariableCheck(gvRiskValue))
+        currentRiskValue = GlobalVariableGet(gvRiskValue);
+    else
+        currentRiskValue = RiskValue;
 
-    // Initialize dynamic R:R ratio from input
-    currentRRRatio = DefaultRRRatio;
+    // Restore R:R ratio from GlobalVariable or use default
+    string gvRRRatio = prefix + "RRRatio";
+    if (GlobalVariableCheck(gvRRRatio))
+        currentRRRatio = GlobalVariableGet(gvRRRatio);
+    else
+        currentRRRatio = DefaultRRRatio;
 
     // Get current price for initial placement
     double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -228,6 +236,8 @@ void OnDeinit(const int reason)
         GlobalVariableDel(prefix + "PanelX");
         GlobalVariableDel(prefix + "PanelY");
         GlobalVariableDel(prefix + "IsLong");
+        GlobalVariableDel(prefix + "RiskValue");
+        GlobalVariableDel(prefix + "RRRatio");
     }
 
     ChartRedraw();
@@ -447,6 +457,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 {
                     currentRiskValue = MathMax(1.0, newRisk);
                 }
+                // Save to GlobalVariable (persists across timeframe changes)
+                GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
                 UpdatePanel();
                 ChartRedraw();
             }
@@ -471,6 +483,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             if (newRR >= 0.1)
             {
                 currentRRRatio = MathMax(0.1, newRR);
+                // Save to GlobalVariable (persists across timeframe changes)
+                GlobalVariableSet(prefix + "RRRatio", currentRRRatio);
                 UpdateTPFromRRRatio();
                 UpdatePanel();
                 ChartRedraw();
@@ -832,6 +846,9 @@ void AdjustRisk(double adjustment)
         currentRiskValue = MathMax(1.0, currentRiskValue); // Minimum $1 for fixed cash
     }
 
+    // Save to GlobalVariable (persists across timeframe changes)
+    GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
+
     UpdatePanel();
 }
 
@@ -842,6 +859,9 @@ void AdjustRRRatio(double adjustment)
 {
     currentRRRatio += adjustment;
     currentRRRatio = MathMax(0.1, currentRRRatio); // Minimum 0.1 R:R
+
+    // Save to GlobalVariable (persists across timeframe changes)
+    GlobalVariableSet(prefix + "RRRatio", currentRRRatio);
 
     // Update TP based on new R:R ratio
     UpdateTPFromRRRatio();
