@@ -56,7 +56,7 @@ input color StopLossColor = clrCrimson;                               // Stop Lo
 input color TakeProfitColor = clrLimeGreen;                           // Take Profit Line Color
 input color RiskZoneColor = clrCrimson;                               // Risk Zone Color
 input color RewardZoneColor = clrLimeGreen;                           // Reward Zone Color
-input int ZoneOpacity = 20;                                           // Zone Opacity (0-100%)
+input int ZoneOpacity = 10;                                           // Zone Opacity (0-100%)
 input int LineWidth = 1;                                              // Line Width
 input ENUM_LINE_STYLE LineStyle = STYLE_DASHDOT;                      // Line Style
 input int FontSize = 9;                                               // Font Size
@@ -104,6 +104,9 @@ int panelWidth = 250;
 int panelHeight = 440;
 int panelHeightMinimized = 30;
 
+// Double-click detection for panel title (milliseconds)
+uint lastTitleClickTime = 0;
+
 // Price increment for +/- buttons (will be calculated based on symbol)
 double priceIncrement;
 
@@ -115,9 +118,26 @@ int OnInit()
     // Set unique prefix for this instance
     prefix = InstanceName + "_";
 
-    // Initialize panel position
-    currentPanelX = PanelX;
-    currentPanelY = PanelY;
+    // Restore minimized state from GlobalVariable (persists across timeframe changes)
+    string gvMinimized = prefix + "Minimized";
+    if (GlobalVariableCheck(gvMinimized))
+        panelMinimized = (GlobalVariableGet(gvMinimized) == 1.0);
+    else
+        panelMinimized = false;
+
+    // Restore panel position from GlobalVariables (persists across timeframe changes)
+    string gvPanelX = prefix + "PanelX";
+    string gvPanelY = prefix + "PanelY";
+    if (GlobalVariableCheck(gvPanelX) && GlobalVariableCheck(gvPanelY))
+    {
+        currentPanelX = (int)GlobalVariableGet(gvPanelX);
+        currentPanelY = (int)GlobalVariableGet(gvPanelY);
+    }
+    else
+    {
+        currentPanelX = PanelX;
+        currentPanelY = PanelY;
+    }
 
     // Initialize dynamic risk value from input
     currentRiskValue = RiskValue;
@@ -169,8 +189,22 @@ int OnInit()
     RedrawLabels();
     UpdatePanel();
 
+    // Restore direction from GlobalVariable (default setup is LONG, flip if persisted direction was SHORT)
+    string gvIsLong = prefix + "IsLong";
+    if (GlobalVariableCheck(gvIsLong) && GlobalVariableGet(gvIsLong) == 0.0)
+    {
+        // Persisted direction was SHORT, flip from default LONG to SHORT
+        FlipDirection();
+    }
+
     // Enable chart event tracking for mouse moves (needed for panel dragging)
     ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
+
+    // Apply minimized state if panel was minimized (hide lines and resize panel)
+    if (panelMinimized)
+    {
+        ApplyMinimizedState();
+    }
 
     ChartRedraw();
 
@@ -186,6 +220,16 @@ void OnDeinit(const int reason)
 {
     // Clean up all objects with our prefix
     ObjectsDeleteAll(0, prefix);
+
+    // Only delete GlobalVariables when EA is explicitly removed (not on timeframe change)
+    if (reason == REASON_REMOVE)
+    {
+        GlobalVariableDel(prefix + "Minimized");
+        GlobalVariableDel(prefix + "PanelX");
+        GlobalVariableDel(prefix + "PanelY");
+        GlobalVariableDel(prefix + "IsLong");
+    }
+
     ChartRedraw();
     Print("RiskRewardTool EA removed: ", InstanceName);
 }
@@ -246,6 +290,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 // Left button released - stop dragging
                 panelDragging = false;
                 ChartSetInteger(0, CHART_MOUSE_SCROLL, true); // Re-enable chart scrolling
+
+                // Save panel position to GlobalVariables (persists across timeframe changes)
+                GlobalVariableSet(prefix + "PanelX", (double)currentPanelX);
+                GlobalVariableSet(prefix + "PanelY", (double)currentPanelY);
             }
         }
         else
@@ -445,6 +493,40 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             TogglePanelMinimize();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             ChartRedraw();
+            return;
+        }
+
+        // Double-click on panel title bar area to toggle minimize
+        // Works on title label OR panel background within title bar region (top 25 pixels)
+        bool isTitleBarClick = false;
+
+        if (sparam == prefix + "LblTitle")
+        {
+            isTitleBarClick = true;
+        }
+        else if (sparam == prefix + "PanelBg")
+        {
+            // Check if click is within title bar region (top 25 pixels of panel)
+            int clickY = (int)dparam;
+            if (clickY >= currentPanelY && clickY <= currentPanelY + 25)
+            {
+                isTitleBarClick = true;
+            }
+        }
+
+        if (isTitleBarClick)
+        {
+            uint currentTime = GetTickCount();
+            if (currentTime - lastTitleClickTime <= 500) // Within 500ms (double-click)
+            {
+                TogglePanelMinimize();
+                ChartRedraw();
+                lastTitleClickTime = 0; // Reset to prevent triple-click
+            }
+            else
+            {
+                lastTitleClickTime = currentTime;
+            }
             return;
         }
 
@@ -682,8 +764,8 @@ void RecreatePanel()
 //+------------------------------------------------------------------+
 void ApplyMinimizedState()
 {
-    // List of objects to hide when minimized
-    string objectsToHide[] = {
+    // List of panel objects to hide when minimized
+    string panelObjectsToHide[] = {
         "LblDirection", "BtnDirection",
         "BtnToggleDisplay",
         "LblEntry", "EditEntry",
@@ -707,16 +789,26 @@ void ApplyMinimizedState()
         "BtnExecute",
         "BtnReset"};
 
-    int numObjects = ArraySize(objectsToHide);
+    int numObjects = ArraySize(panelObjectsToHide);
 
     for (int i = 0; i < numObjects; i++)
     {
-        string objName = prefix + objectsToHide[i];
+        string objName = prefix + panelObjectsToHide[i];
         if (ObjectFind(0, objName) >= 0)
         {
             ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
         }
     }
+
+    // Delete chart objects (lines, zones, labels) when minimized
+    ObjectDelete(0, prefix + "EntryLine");
+    ObjectDelete(0, prefix + "SLLine");
+    ObjectDelete(0, prefix + "TPLine");
+    ObjectDelete(0, prefix + "RiskZone");
+    ObjectDelete(0, prefix + "RewardZone");
+    ObjectDelete(0, prefix + "EntryLabel");
+    ObjectDelete(0, prefix + "SLLabel");
+    ObjectDelete(0, prefix + "TPLabel");
 
     // Resize panel background to minimized height
     ObjectSetInteger(0, prefix + "PanelBg", OBJPROP_YSIZE, panelHeightMinimized);
@@ -855,6 +947,10 @@ void FlipDirection()
 
     bool wasLong = IsLongPosition();
 
+    // Save new direction to GlobalVariable (persists across timeframe changes)
+    // After flip: wasLong means new direction will be SHORT (0), !wasLong means new direction will be LONG (1)
+    GlobalVariableSet(prefix + "IsLong", wasLong ? 0.0 : 1.0);
+
     if (wasLong)
     {
         // Was Long, flip to Short: SL above entry, TP below entry
@@ -942,26 +1038,38 @@ void ExecuteOrder()
 
     request.symbol = _Symbol;
     request.volume = lots;
-    request.sl = NormalizeDouble(sl, _Digits);
-    request.tp = NormalizeDouble(tp, _Digits);
     request.deviation = Slippage;
     request.magic = GenerateMagicNumber(InstanceName);
     request.comment = InstanceName;
-    request.type_filling = GetFillingMode();
     request.type = smartOrderType;
+
+    // Get symbol info for filling mode and set the correct one
+    uint filling = (uint)SymbolInfoInteger(_Symbol, SYMBOL_FILLING_MODE);
+    if ((filling & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK)
+        request.type_filling = ORDER_FILLING_FOK;
+    else if ((filling & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC)
+        request.type_filling = ORDER_FILLING_IOC;
+    else
+        request.type_filling = ORDER_FILLING_RETURN;
 
     // Set action based on order type
     if (smartOrderType == ORDER_TYPE_BUY || smartOrderType == ORDER_TYPE_SELL)
     {
         // Market order - instant execution
+        // Don't set type_time for market orders
         request.action = TRADE_ACTION_DEAL;
         request.price = isLong ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+        request.sl = NormalizeDouble(sl, _Digits);
+        request.tp = NormalizeDouble(tp, _Digits);
     }
     else
     {
         // Pending order (LIMIT or STOP)
         request.action = TRADE_ACTION_PENDING;
         request.price = NormalizeDouble(entry, _Digits);
+        request.sl = NormalizeDouble(sl, _Digits);
+        request.tp = NormalizeDouble(tp, _Digits);
+        request.type_time = ORDER_TIME_GTC;
     }
 
     // Send order
@@ -1048,15 +1156,26 @@ void ExecuteMarketOrder()
     ZeroMemory(request);
     ZeroMemory(result);
 
+    // Build request for market order
     request.action = TRADE_ACTION_DEAL;
     request.symbol = _Symbol;
     request.volume = lots;
-    request.sl = NormalizeDouble(sl, _Digits);
-    request.tp = NormalizeDouble(tp, _Digits);
     request.deviation = Slippage;
     request.magic = GenerateMagicNumber(InstanceName);
     request.comment = InstanceName;
-    request.type_filling = GetFillingMode();
+
+    // For TRADE_ACTION_DEAL (market orders), do NOT set type_time
+    // Market orders execute immediately, expiration doesn't apply
+    // Setting type_time can cause error 10027 on some brokers
+
+    // Get symbol info for filling mode and set the correct one
+    uint filling = (uint)SymbolInfoInteger(_Symbol, SYMBOL_FILLING_MODE);
+    if ((filling & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK)
+        request.type_filling = ORDER_FILLING_FOK;
+    else if ((filling & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC)
+        request.type_filling = ORDER_FILLING_IOC;
+    else
+        request.type_filling = ORDER_FILLING_RETURN;
 
     if (isLong)
     {
@@ -1081,9 +1200,36 @@ void ExecuteMarketOrder()
     {
         if (result.retcode == TRADE_RETCODE_DONE)
         {
-            string successMsg = StringFormat("Market order executed!\nTicket: %d", result.order);
-            Alert(successMsg);
+            ulong positionTicket = result.order;
+            string successMsg = StringFormat("Market order executed! Ticket: %d", positionTicket);
             Print(successMsg);
+
+            // Step 2: Modify position to add SL/TP
+            Sleep(200); // Wait for position to register
+
+            MqlTradeRequest modifyRequest = {};
+            MqlTradeResult modifyResult = {};
+            ZeroMemory(modifyRequest);
+            ZeroMemory(modifyResult);
+
+            modifyRequest.action = TRADE_ACTION_SLTP;
+            modifyRequest.symbol = _Symbol;
+            modifyRequest.position = positionTicket;
+            modifyRequest.sl = NormalizeDouble(sl, _Digits);
+            modifyRequest.tp = NormalizeDouble(tp, _Digits);
+
+            if (!OrderSend(modifyRequest, modifyResult) || modifyResult.retcode != TRADE_RETCODE_DONE)
+            {
+                string warnMsg = StringFormat("Order placed but failed to set SL/TP!\nTicket: %d\nError: %d - %s",
+                                              positionTicket, modifyResult.retcode, GetRetcodeDescription(modifyResult.retcode));
+                Alert(warnMsg);
+                Print(warnMsg);
+            }
+            else
+            {
+                Alert(successMsg + "\nSL/TP set successfully!");
+            }
+
             // Remove drawing objects after successful order
             RemoveDrawingObjects();
         }
@@ -1132,19 +1278,6 @@ bool ValidateStopsDistance()
     }
 
     return true;
-}
-
-//+------------------------------------------------------------------+
-//| Get correct filling mode for broker                              |
-//+------------------------------------------------------------------+
-ENUM_ORDER_TYPE_FILLING GetFillingMode()
-{
-    uint filling = (uint)SymbolInfoInteger(_Symbol, SYMBOL_FILLING_MODE);
-    if ((filling & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC)
-        return ORDER_FILLING_IOC;
-    if ((filling & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK)
-        return ORDER_FILLING_FOK;
-    return ORDER_FILLING_RETURN;
 }
 
 //+------------------------------------------------------------------+
@@ -2061,8 +2194,11 @@ void TogglePanelMinimize()
 {
     panelMinimized = !panelMinimized;
 
-    // List of objects to hide/show (all except panel background, title, and minimize button)
-    string objectsToToggle[] = {
+    // Save minimized state to GlobalVariable (persists across timeframe changes)
+    GlobalVariableSet(prefix + "Minimized", panelMinimized ? 1.0 : 0.0);
+
+    // List of panel objects to hide/show using OBJPROP_TIMEFRAMES
+    string panelObjectsToToggle[] = {
         "LblDirection", "BtnDirection",
         "BtnToggleDisplay",
         "LblEntry", "EditEntry",
@@ -2086,11 +2222,11 @@ void TogglePanelMinimize()
         "BtnExecute",
         "BtnReset"};
 
-    int numObjects = ArraySize(objectsToToggle);
+    int numPanelObjects = ArraySize(panelObjectsToToggle);
 
-    for (int i = 0; i < numObjects; i++)
+    for (int i = 0; i < numPanelObjects; i++)
     {
-        string objName = prefix + objectsToToggle[i];
+        string objName = prefix + panelObjectsToToggle[i];
         if (ObjectFind(0, objName) >= 0)
         {
             ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, panelMinimized ? OBJ_NO_PERIODS : OBJ_ALL_PERIODS);
@@ -2102,11 +2238,34 @@ void TogglePanelMinimize()
     {
         ObjectSetInteger(0, prefix + "PanelBg", OBJPROP_YSIZE, panelHeightMinimized);
         ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "+");
+
+        // Delete chart objects (lines, zones, labels) when minimizing
+        ObjectDelete(0, prefix + "EntryLine");
+        ObjectDelete(0, prefix + "SLLine");
+        ObjectDelete(0, prefix + "TPLine");
+        ObjectDelete(0, prefix + "RiskZone");
+        ObjectDelete(0, prefix + "RewardZone");
+        ObjectDelete(0, prefix + "EntryLabel");
+        ObjectDelete(0, prefix + "SLLabel");
+        ObjectDelete(0, prefix + "TPLabel");
     }
     else
     {
         ObjectSetInteger(0, prefix + "PanelBg", OBJPROP_YSIZE, panelHeight);
         ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "_");
+
+        // Recreate chart objects when maximizing
+        CreateEntryLine();
+        CreateSLLine();
+        CreateTPLine();
+        CreateRiskZone();
+        CreateRewardZone();
+        CreatePriceLabels();
+
+        // Update positions and redraw
+        RedrawZones();
+        RedrawLabels();
+        UpdatePanel();
     }
 }
 //+------------------------------------------------------------------+

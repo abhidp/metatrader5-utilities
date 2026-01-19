@@ -9,7 +9,15 @@
       "Bash(cmd /c \"type C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\build_log.vantage.txt\")",
       "Bash(cmd.exe:*)",
       "Bash(powershell -Command \"Get-Content ''C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5'' | Select-Object -Skip 1426 -First 1\")",
-      "Bash(\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\compile.bat\" \"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\")"
+      "Bash(\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\compile.bat\" \"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\orb\\\\*.mq5\")",
+      "Bash(dir \"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\orb\" /s /b)",
+      "Bash(findstr:*)",
+      "Bash(cmd /c \"dir C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\*.ex5 /B /O:D\")",
+      "Bash(cmd /c \"\"\"C:/Program Files/Vantage Australia MT5 Terminal/MetaEditor64.exe\"\" /compile:\"\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\"\" /log:\"\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\build_log.vantage.txt\"\"\")",
+      "Bash(powershell -Command \"& ''C:/Program Files/Vantage Australia MT5 Terminal/MetaEditor64.exe'' ''/compile:C:/Users/abhid/Documents/Projects/metatrader5-utilities/Experts/Abhis_EAs/RiskRewardTool.mq5'' ''/log:C:/Users/abhid/Documents/Projects/metatrader5-utilities/build_log.txt''\")",
+      "Bash(powershell -NoProfile -Command \"Get-ChildItem ''C:/Users/abhid/Documents/Projects/metatrader5-utilities/Experts/Abhis_EAs/*.ex5'' | Select-Object Name,LastWriteTime\")",
+      "Bash(powershell -NoProfile -Command:*)"
     ]
   }
 }
