@@ -460,6 +460,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 // Save to GlobalVariable (persists across timeframe changes)
                 GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
                 UpdatePanel();
+                RedrawLabels();
                 ChartRedraw();
             }
             else
@@ -850,6 +851,8 @@ void AdjustRisk(double adjustment)
     GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
 
     UpdatePanel();
+    RedrawLabels();
+    ChartRedraw();
 }
 
 //+------------------------------------------------------------------+
@@ -1513,19 +1516,23 @@ void CreateLineLabelWithBackground(string id, double price, color clr, string la
     // Use visible chart area instead of TimeCurrent() (works even when market is closed)
     int firstVisibleBar = (int)ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR);
     int visibleBars = (int)ChartGetInteger(0, CHART_VISIBLE_BARS);
-    int rightBarIndex = firstVisibleBar - visibleBars + 5; // 5 bars from right edge
+    int rightBarIndex = firstVisibleBar - visibleBars + 1; // 1 bar from right edge (extreme right)
     if (rightBarIndex < 0) rightBarIndex = 0;
     datetime labelTime = iTime(_Symbol, PERIOD_CURRENT, rightBarIndex);
 
     string fullText = " " + labelText + ": " + DoubleToString(price, _Digits) + " ";
 
-    // Convert price/time to screen coordinates
-    int x, y;
-    ChartTimePriceToXY(0, 0, labelTime, price, x, y);
-
-    // Calculate text dimensions
-    int textWidth = StringLen(fullText) * (FontSize - 2) + 16;
+    // Fixed width for all labels (same width, center aligned)
+    int textWidth = 280;
     int textHeight = FontSize + 10;
+
+    // Get chart width and position label at the extreme right edge
+    int chartWidth = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+    int x = chartWidth - textWidth - 5; // 5 pixels padding from right edge
+
+    // Convert price to screen Y coordinate
+    int tempX, y;
+    ChartTimePriceToXY(0, 0, labelTime, price, tempX, y);
 
     // Use OBJ_EDIT as a read-only label with proper background (best alignment)
     ObjectCreate(0, name, OBJ_EDIT, 0, 0, 0);
@@ -1780,26 +1787,41 @@ void RedrawLabels()
     // Use visible chart area instead of TimeCurrent() (works even when market is closed)
     int firstVisibleBar = (int)ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR);
     int visibleBars = (int)ChartGetInteger(0, CHART_VISIBLE_BARS);
-    int rightBarIndex = firstVisibleBar - visibleBars + 5; // 5 bars from right edge
+    int rightBarIndex = firstVisibleBar - visibleBars + 1; // 1 bar from right edge (extreme right)
     if (rightBarIndex < 0) rightBarIndex = 0;
     datetime labelTime = iTime(_Symbol, PERIOD_CURRENT, rightBarIndex);
 
     double slPips = GetPipsDistance(entryPrice, slPrice);
     double tpPips = GetPipsDistance(entryPrice, tpPrice);
 
-    // Entry label with R:R ratio (show decimal only if needed)
+    // Entry label with lot size and R:R ratio
+    double lots = CalculateLotSize();
     string rrStr = (currentRRRatio == MathFloor(currentRRRatio))
                    ? DoubleToString(currentRRRatio, 0)
                    : DoubleToString(currentRRRatio, 1);
-    string entryText = " ENTRY: " + DoubleToString(entryPrice, _Digits) + " (RR:" + rrStr + ") ";
+    string entryText = " ENTRY: " + DoubleToString(entryPrice, _Digits) + " |  Lots: " + DoubleToString(lots, 2) + "  |  RR:" + rrStr + " ";
     UpdateLineLabel("EntryLabel", labelTime, entryPrice, entryText);
 
-    // SL label with pips
-    string slText = " SL: " + DoubleToString(slPrice, _Digits) + " (" + DoubleToString(slPips, 1) + "p) ";
+    // Calculate risk percentage (for display)
+    double riskPercent;
+    if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+    {
+        riskPercent = currentRiskValue;
+    }
+    else
+    {
+        // Fixed cash mode - calculate percentage based on balance
+        double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+        riskPercent = (balance > 0) ? (currentRiskValue / balance) * 100.0 : 0;
+    }
+    double rewardPercent = riskPercent * currentRRRatio;
+
+    // SL label with pips and risk %
+    string slText = " SL: " + DoubleToString(slPrice, _Digits) + " | " + DoubleToString(slPips, 1) + " pips | -" + DoubleToString(riskPercent, 1) + "% ";
     UpdateLineLabel("SLLabel", labelTime, slPrice, slText);
 
-    // TP label with pips
-    string tpText = " TP: " + DoubleToString(tpPrice, _Digits) + " (" + DoubleToString(tpPips, 1) + "p) ";
+    // TP label with pips and reward %
+    string tpText = " TP: " + DoubleToString(tpPrice, _Digits) + " | " + DoubleToString(tpPips, 1) + " pips | +" + DoubleToString(rewardPercent, 1) + "% ";
     UpdateLineLabel("TPLabel", labelTime, tpPrice, tpText);
 }
 
@@ -1810,13 +1832,17 @@ void UpdateLineLabel(string id, datetime labelTime, double price, string text)
 {
     string name = prefix + id;
 
-    // Convert price/time to screen coordinates
-    int x, y;
-    ChartTimePriceToXY(0, 0, labelTime, price, x, y);
-
-    // Calculate text dimensions
-    int textWidth = StringLen(text) * (FontSize - 2) + 16;
+    // Fixed width for all labels (fits longest text: ENTRY with lots and R:R ratio)
+    int textWidth = 230;
     int textHeight = FontSize + 10;
+
+    // Get chart width and position label at the extreme right edge
+    int chartWidth = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+    int x = chartWidth - textWidth - 5; // 5 pixels padding from right edge
+
+    // Convert price to screen Y coordinate
+    int tempX, y;
+    ChartTimePriceToXY(0, 0, labelTime, price, tempX, y);
 
     // Update position, size, text, and ensure font consistency
     ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
@@ -1824,6 +1850,7 @@ void UpdateLineLabel(string id, datetime labelTime, double price, string text)
     ObjectSetInteger(0, name, OBJPROP_XSIZE, textWidth);
     ObjectSetInteger(0, name, OBJPROP_YSIZE, textHeight);
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, FontSize);
+    ObjectSetInteger(0, name, OBJPROP_ALIGN, ALIGN_CENTER);
     ObjectSetString(0, name, OBJPROP_TEXT, text);
 }
 
@@ -2157,8 +2184,13 @@ void ResetLinesToDefault()
     // Preserve current direction (LONG or SHORT)
     bool wasLong = IsLongPosition();
 
+    // Reset risk value to default from inputs
+    currentRiskValue = RiskValue;
+    GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
+
     // Reset R:R ratio to default value from inputs
     currentRRRatio = DefaultRRRatio;
+    GlobalVariableSet(prefix + "RRRatio", currentRRRatio);
 
     entryPrice = NormalizeDouble(currentPrice, digits);
 
