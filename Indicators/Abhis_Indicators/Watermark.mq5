@@ -144,16 +144,9 @@ string GetTimeframeText()
    {
       switch(tf)
       {
-         case PERIOD_M1:  return "1m";
-         case PERIOD_M2:  return "2m";
-         case PERIOD_M3:  return "3m";
-         case PERIOD_M4:  return "4m";
-         case PERIOD_M5:  return "5m";
-         case PERIOD_M6:  return "6m";
-         case PERIOD_M10: return "10m";
-         case PERIOD_M12: return "12m";
+         case PERIOD_M1: return "1m";
+         case PERIOD_M5: return "5m";
          case PERIOD_M15: return "15m";
-         case PERIOD_M20: return "20m";
          case PERIOD_M30: return "30m";
          case PERIOD_H1:  return "1H";
          case PERIOD_H2:  return "2H";
