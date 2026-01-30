@@ -35,6 +35,12 @@ enum ENUM_PRICE_DISPLAY_MODE
     DISPLAY_PIPS_DISTANCE   // Show pips from entry
 };
 
+enum ENUM_PANEL_THEME
+{
+    THEME_DARK,   // Dark Mode
+    THEME_LIGHT   // Light Mode
+};
+
 //+------------------------------------------------------------------+
 //| Input Parameters                                                 |
 //+------------------------------------------------------------------+
@@ -51,18 +57,12 @@ input int Slippage = 10;              // Slippage (points)
 input string InstanceName = "RR1";    // Instance Name (for multiple charts)
 
 // === Visual Settings ===
-input group "Visual Settings" input color EntryColor = clrDodgerBlue; // Entry Line Color
-input color StopLossColor = clrCrimson;                               // Stop Loss Line Color
-input color TakeProfitColor = clrLimeGreen;                           // Take Profit Line Color
-input color RiskZoneColor = clrCrimson;                               // Risk Zone Color
-input color RewardZoneColor = clrLimeGreen;                           // Reward Zone Color
-input int ZoneOpacity = 10;                                           // Zone Opacity (0-100%)
-input int LineWidth = 1;                                              // Line Width
-input ENUM_LINE_STYLE LineStyle = STYLE_DASHDOT;                      // Line Style
-input int FontSize = 9;                                               // Font Size
-input color TextColor = clrWhite;                                     // Text Color
-input color PanelBgColor = C'40,40,40';                                // Panel Background Color
-input color PanelBorderColor = clrGray;                               // Panel Border Color
+input group "Visual Settings"
+input ENUM_PANEL_THEME PanelTheme = THEME_LIGHT;   // Panel Theme
+input int FontSize = 9;                            // Font Size
+input int LineWidth = 1;                           // Line Width
+input ENUM_LINE_STYLE LineStyle = STYLE_DASHDOT;  // Line Style
+input int ZoneOpacity = 10;                        // Zone Opacity (0-100%)
 
 // === Panel Settings ===
 input group "Panel Settings" input ENUM_BASE_CORNER PanelCorner = CORNER_LEFT_UPPER; // Panel Corner
@@ -93,6 +93,34 @@ int panelDragOffsetY = 0;
 int currentPanelX;
 int currentPanelY;
 
+// Track if lines are currently selectable (disabled when mouse over panel)
+bool linesSelectable = true;
+
+// Current theme (can be toggled at runtime)
+ENUM_PANEL_THEME currentTheme;
+
+// Theme Colors (set by InitThemeColors)
+color clrPanelBg;           // Main panel background
+color clrPanelBorder;       // Panel border
+color clrSectionBg;         // Section background (for grouping)
+color clrTextPrimary;       // Primary text color
+color clrTextSecondary;     // Secondary/dimmed text
+color clrTextMuted;         // Muted text (separators, labels)
+color clrInputBg;           // Input field background
+color clrInputBorder;       // Input field border
+color clrInputText;         // Input field text
+color clrBtnBg;             // Button background
+color clrBtnBorder;         // Button border
+color clrBtnText;           // Button text
+color clrBtnPlusMinus;      // +/- button background
+color clrAccentBuy;         // Buy/Long accent (green)
+color clrAccentSell;        // Sell/Short accent (red)
+color clrAccentEntry;       // Entry line/field accent (blue)
+color clrAccentWarning;     // Warning/Risk accent (orange)
+color clrAccentGold;        // Gold accent for R:R, lots
+color clrHeaderBg;          // Header/title bar background
+color clrHeaderText;        // Header text color
+
 // Dynamic risk value (can be adjusted from panel)
 double currentRiskValue;
 
@@ -100,9 +128,9 @@ double currentRiskValue;
 double currentRRRatio;
 
 // Panel dimensions
-int panelWidth = 250;
-int panelHeight = 440;
-int panelHeightMinimized = 30;
+int panelWidth = 270;
+int panelHeight = 460;
+int panelHeightMinimized = 28;
 
 // Double-click detection for panel title (milliseconds)
 uint lastTitleClickTime = 0;
@@ -111,12 +139,93 @@ uint lastTitleClickTime = 0;
 double priceIncrement;
 
 //+------------------------------------------------------------------+
+//| Initialize theme colors based on selected theme                  |
+//+------------------------------------------------------------------+
+void InitThemeColors()
+{
+    if (currentTheme == THEME_LIGHT)
+    {
+        // Light Theme - Clean, modern, high contrast
+        clrPanelBg = C'245,245,247';        // Light gray background
+        clrPanelBorder = C'200,200,205';    // Subtle border
+        clrSectionBg = C'255,255,255';      // White sections
+        clrTextPrimary = C'30,30,35';       // Near black text
+        clrTextSecondary = C'80,80,90';     // Dark gray
+        clrTextMuted = C'150,150,160';      // Muted gray
+        clrInputBg = C'255,255,255';        // White input background
+        clrInputBorder = C'180,180,190';    // Input border
+        clrInputText = C'30,30,35';         // Dark input text
+        clrBtnBg = C'235,235,240';          // Light button background
+        clrBtnBorder = C'180,180,190';      // Button border
+        clrBtnText = C'50,50,60';           // Button text
+        clrBtnPlusMinus = C'225,225,230';   // +/- button background
+        clrAccentBuy = C'34,139,34';        // Forest green (Long)
+        clrAccentSell = C'178,34,34';       // Firebrick red (Short)
+        clrAccentEntry = C'30,100,180';     // Blue (Entry)
+        clrAccentWarning = C'210,105,30';   // Chocolate orange (Risk)
+        clrAccentGold = C'180,130,20';      // Dark gold
+        clrHeaderBg = C'50,55,65';          // Dark header
+        clrHeaderText = C'255,255,255';     // White header text
+    }
+    else
+    {
+        // Dark Theme - Modern dark with good contrast
+        clrPanelBg = C'32,34,37';           // Dark background
+        clrPanelBorder = C'60,63,68';       // Subtle border
+        clrSectionBg = C'44,47,51';         // Slightly lighter sections
+        clrTextPrimary = C'220,222,225';    // Off-white text
+        clrTextSecondary = C'160,165,175';  // Light gray
+        clrTextMuted = C'100,105,115';      // Muted gray
+        clrInputBg = C'55,58,62';           // Dark input background
+        clrInputBorder = C'80,85,95';       // Input border
+        clrInputText = C'230,232,235';      // Light input text
+        clrBtnBg = C'55,58,62';             // Dark button background
+        clrBtnBorder = C'80,85,95';         // Button border
+        clrBtnText = C'200,205,215';        // Light button text
+        clrBtnPlusMinus = C'65,68,75';      // +/- button background
+        clrAccentBuy = C'50,205,50';        // Lime green (Long)
+        clrAccentSell = C'255,80,80';       // Bright red (Short)
+        clrAccentEntry = C'65,145,255';     // Bright blue (Entry)
+        clrAccentWarning = C'255,165,50';   // Orange (Risk)
+        clrAccentGold = C'255,200,50';      // Bright gold
+        clrHeaderBg = C'25,27,30';          // Darker header
+        clrHeaderText = C'255,200,50';      // Gold header text
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Toggle theme between light and dark                              |
+//+------------------------------------------------------------------+
+void ToggleTheme()
+{
+    currentTheme = (currentTheme == THEME_LIGHT) ? THEME_DARK : THEME_LIGHT;
+
+    // Save theme to GlobalVariable (persists across timeframe changes)
+    GlobalVariableSet(prefix + "Theme", (double)currentTheme);
+
+    // Reinitialize colors and recreate panel
+    InitThemeColors();
+    RecreatePanel();
+    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
     // Set unique prefix for this instance
     prefix = InstanceName + "_";
+
+    // Restore theme from GlobalVariable or use input default
+    string gvTheme = prefix + "Theme";
+    if (GlobalVariableCheck(gvTheme))
+        currentTheme = (ENUM_PANEL_THEME)(int)GlobalVariableGet(gvTheme);
+    else
+        currentTheme = PanelTheme;
+
+    // Initialize theme colors
+    InitThemeColors();
 
     // Restore minimized state from GlobalVariable (persists across timeframe changes)
     string gvMinimized = prefix + "Minimized";
@@ -161,27 +270,42 @@ int OnInit()
     // Calculate price increment for +/- buttons (1 pip for forex, 1 point for others)
     priceIncrement = (digits == 3 || digits == 5) ? point * 10 : point;
 
-    // Calculate sensible default distances using ATR
-    int atrHandle = iATR(_Symbol, PERIOD_CURRENT, 14);
-    double atrBuffer[];
-    ArraySetAsSeries(atrBuffer, true);
+    // Restore line prices from GlobalVariables (persists across timeframe changes)
+    string gvEntryPrice = prefix + "EntryPrice";
+    string gvSLPrice = prefix + "SLPrice";
+    string gvTPPrice = prefix + "TPPrice";
 
-    double atrValue;
-    if (CopyBuffer(atrHandle, 0, 0, 1, atrBuffer) > 0)
+    if (GlobalVariableCheck(gvEntryPrice) && GlobalVariableCheck(gvSLPrice) && GlobalVariableCheck(gvTPPrice))
     {
-        atrValue = atrBuffer[0];
+        // Restore saved prices
+        entryPrice = NormalizeDouble(GlobalVariableGet(gvEntryPrice), digits);
+        slPrice = NormalizeDouble(GlobalVariableGet(gvSLPrice), digits);
+        tpPrice = NormalizeDouble(GlobalVariableGet(gvTPPrice), digits);
     }
     else
     {
-        // Fallback: use 1% of price
-        atrValue = currentPrice * 0.01;
-    }
-    IndicatorRelease(atrHandle);
+        // Calculate sensible default distances using ATR
+        int atrHandle = iATR(_Symbol, PERIOD_CURRENT, 14);
+        double atrBuffer[];
+        ArraySetAsSeries(atrBuffer, true);
 
-    // Initialize prices (default to LONG setup)
-    entryPrice = NormalizeDouble(currentPrice, digits);
-    slPrice = NormalizeDouble(currentPrice - atrValue, digits);
-    tpPrice = NormalizeDouble(currentPrice + (atrValue * DefaultRRRatio), digits);
+        double atrValue;
+        if (CopyBuffer(atrHandle, 0, 0, 1, atrBuffer) > 0)
+        {
+            atrValue = atrBuffer[0];
+        }
+        else
+        {
+            // Fallback: use 1% of price
+            atrValue = currentPrice * 0.01;
+        }
+        IndicatorRelease(atrHandle);
+
+        // Initialize prices (default to LONG setup)
+        entryPrice = NormalizeDouble(currentPrice, digits);
+        slPrice = NormalizeDouble(currentPrice - atrValue, digits);
+        tpPrice = NormalizeDouble(currentPrice + (atrValue * DefaultRRRatio), digits);
+    }
 
     // Create all visual objects
     CreateEntryLine();
@@ -196,14 +320,6 @@ int OnInit()
     RedrawZones();
     RedrawLabels();
     UpdatePanel();
-
-    // Restore direction from GlobalVariable (default setup is LONG, flip if persisted direction was SHORT)
-    string gvIsLong = prefix + "IsLong";
-    if (GlobalVariableCheck(gvIsLong) && GlobalVariableGet(gvIsLong) == 0.0)
-    {
-        // Persisted direction was SHORT, flip from default LONG to SHORT
-        FlipDirection();
-    }
 
     // Enable chart event tracking for mouse moves (needed for panel dragging)
     ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
@@ -238,6 +354,10 @@ void OnDeinit(const int reason)
         GlobalVariableDel(prefix + "IsLong");
         GlobalVariableDel(prefix + "RiskValue");
         GlobalVariableDel(prefix + "RRRatio");
+        GlobalVariableDel(prefix + "EntryPrice");
+        GlobalVariableDel(prefix + "SLPrice");
+        GlobalVariableDel(prefix + "TPPrice");
+        GlobalVariableDel(prefix + "Theme");
     }
 
     ChartRedraw();
@@ -275,6 +395,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
         // Check if left mouse button is pressed (bit 0)
         bool leftButtonPressed = (mouseState & 1) == 1;
+
+        // Disable line selectability when mouse is over the panel (prevents clicking through)
+        bool overPanel = IsMouseOverPanel(mouseX, mouseY);
+        SetLinesSelectable(!overPanel);
 
         if (panelDragging)
         {
@@ -330,6 +454,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             {
                 UpdatePricesFromLines();
                 UpdateRRRatioFromLines(); // Update R:R ratio based on new line positions
+                SaveLinePrices(); // Persist across timeframe changes
                 RedrawZones();
                 RedrawLabels();
                 UpdatePanel();
@@ -350,6 +475,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 entryPrice = NormalizeDouble(newPrice, _Digits);
                 ObjectSetDouble(0, prefix + "EntryLine", OBJPROP_PRICE, entryPrice);
                 UpdateRRRatioFromLines();
+                SaveLinePrices();
                 RedrawZones();
                 RedrawLabels();
                 UpdatePanel();
@@ -386,6 +512,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 }
                 ObjectSetDouble(0, prefix + "SLLine", OBJPROP_PRICE, slPrice);
                 UpdateRRRatioFromLines();
+                SaveLinePrices();
                 RedrawZones();
                 RedrawLabels();
                 UpdatePanel();
@@ -425,6 +552,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 }
                 ObjectSetDouble(0, prefix + "TPLine", OBJPROP_PRICE, tpPrice);
                 UpdateRRRatioFromLines();
+                SaveLinePrices();
                 RedrawZones();
                 RedrawLabels();
                 UpdatePanel();
@@ -497,6 +625,40 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             }
             return;
         }
+        if (sparam == prefix + "EditLots")
+        {
+            string text = ObjectGetString(0, sparam, OBJPROP_TEXT);
+            double newLots = StringToDouble(text);
+
+            // Normalize to broker requirements
+            double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+            double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+            double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+
+            if (newLots >= minLot)
+            {
+                // Normalize lot size
+                newLots = NormalizeDouble(MathRound(newLots / lotStep) * lotStep, 2);
+                newLots = MathMax(minLot, MathMin(maxLot, newLots));
+
+                // Back-calculate risk from the entered lot size
+                CalculateRiskFromLots(newLots);
+
+                // Update lot field with normalized value
+                ObjectSetString(0, sparam, OBJPROP_TEXT, DoubleToString(newLots, 2));
+
+                // Update panel (except lots to preserve entered value) and labels
+                UpdatePanelExceptLots();
+                RedrawLabels();
+                ChartRedraw();
+            }
+            else
+            {
+                // Restore the calculated lot size if invalid
+                ObjectSetString(0, sparam, OBJPROP_TEXT, DoubleToString(CalculateLotSize(), 2));
+            }
+            return;
+        }
     }
 
     // === Handle Button Clicks ===
@@ -508,6 +670,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             TogglePanelMinimize();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             ChartRedraw();
+            return;
+        }
+
+        // Theme toggle button
+        if (sparam == prefix + "BtnTheme")
+        {
+            ToggleTheme();
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             return;
         }
 
@@ -572,6 +742,22 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         if (sparam == prefix + "BtnRRMinus")
         {
             AdjustRRRatio(-0.1); // Decrease by 0.1
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+            ChartRedraw();
+            return;
+        }
+
+        // === Lot Size +/- Buttons ===
+        if (sparam == prefix + "BtnLotsPlus")
+        {
+            AdjustLotSize(SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP)); // Increase by lot step
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+            ChartRedraw();
+            return;
+        }
+        if (sparam == prefix + "BtnLotsMinus")
+        {
+            AdjustLotSize(-SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP)); // Decrease by lot step
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             ChartRedraw();
             return;
@@ -667,6 +853,52 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ResetLinesToDefault();
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             ChartRedraw();
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Save line prices to GlobalVariables (persist across TF changes)  |
+//+------------------------------------------------------------------+
+void SaveLinePrices()
+{
+    GlobalVariableSet(prefix + "EntryPrice", entryPrice);
+    GlobalVariableSet(prefix + "SLPrice", slPrice);
+    GlobalVariableSet(prefix + "TPPrice", tpPrice);
+}
+
+//+------------------------------------------------------------------+
+//| Check if mouse is over the panel area                            |
+//+------------------------------------------------------------------+
+bool IsMouseOverPanel(int x, int y)
+{
+    int actualPanelHeight = panelMinimized ? panelHeightMinimized : panelHeight;
+    return (x >= currentPanelX && x <= currentPanelX + panelWidth &&
+            y >= currentPanelY && y <= currentPanelY + actualPanelHeight);
+}
+
+//+------------------------------------------------------------------+
+//| Set line selectability state                                     |
+//+------------------------------------------------------------------+
+void SetLinesSelectable(bool selectable)
+{
+    if (linesSelectable == selectable)
+        return; // No change needed
+
+    linesSelectable = selectable;
+
+    // Only modify lines if they exist (panel is expanded)
+    if (!panelMinimized)
+    {
+        string lineNames[] = {prefix + "EntryLine", prefix + "SLLine", prefix + "TPLine"};
+        for (int i = 0; i < 3; i++)
+        {
+            if (ObjectFind(0, lineNames[i]) >= 0)
+            {
+                ObjectSetInteger(0, lineNames[i], OBJPROP_SELECTABLE, selectable);
+                if (!selectable)
+                    ObjectSetInteger(0, lineNames[i], OBJPROP_SELECTED, false);
+            }
         }
     }
 }
@@ -781,6 +1013,7 @@ void ApplyMinimizedState()
 {
     // List of panel objects to hide when minimized
     string panelObjectsToHide[] = {
+        "RectHeaderBg", "RectPriceSection", "RectRiskSection", "RectLotSection",
         "LblDirection", "BtnDirection",
         "BtnToggleDisplay",
         "LblEntry", "EditEntry",
@@ -789,15 +1022,13 @@ void ApplyMinimizedState()
         "BtnSLMinus", "BtnSLPlus",
         "LblTP", "EditTP",
         "BtnTPMinus", "BtnTPPlus",
-        "LblSep1",
         "LblRiskPct", "EditRisk",
         "BtnRiskMinus", "BtnRiskPlus",
         "LblRisk", "LblRiskVal",
         "LblReward", "LblRewardVal",
         "LblRRRatio", "LblRRPrefix", "EditRR",
         "BtnRRMinus", "BtnRRPlus",
-        "LblSep2",
-        "LblLots", "LblLotsVal",
+        "LblLots", "EditLots", "BtnLotsMinus", "BtnLotsPlus",
         "LblRiskMode", "LblRiskModeVal",
         "LblOrderType", "LblOrderTypeVal",
         "BtnMarketOrder",
@@ -827,7 +1058,7 @@ void ApplyMinimizedState()
 
     // Resize panel background to minimized height
     ObjectSetInteger(0, prefix + "PanelBg", OBJPROP_YSIZE, panelHeightMinimized);
-    ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "+");
+    ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "□");
 }
 
 //+------------------------------------------------------------------+
@@ -872,6 +1103,42 @@ void AdjustRRRatio(double adjustment)
 }
 
 //+------------------------------------------------------------------+
+//| Adjust lot size value                                            |
+//+------------------------------------------------------------------+
+void AdjustLotSize(double adjustment)
+{
+    // Read current lot size from the edit field (not calculated) to avoid precision drift
+    string currentText = ObjectGetString(0, prefix + "EditLots", OBJPROP_TEXT);
+    double currentLots = StringToDouble(currentText);
+
+    // If field is empty or invalid, use calculated value as fallback
+    if (currentLots <= 0)
+        currentLots = CalculateLotSize();
+
+    double newLots = currentLots + adjustment;
+
+    // Normalize to broker requirements
+    double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+    double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+    double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+
+    // Round to lot step precision
+    newLots = NormalizeDouble(MathRound(newLots / lotStep) * lotStep, 2);
+    newLots = MathMax(minLot, MathMin(maxLot, newLots));
+
+    // Back-calculate risk from the new lot size
+    CalculateRiskFromLots(newLots);
+
+    // Update the edit field directly with the new lot size (avoid recalculation drift)
+    ObjectSetString(0, prefix + "EditLots", OBJPROP_TEXT, DoubleToString(newLots, 2));
+
+    // Update rest of panel and labels (but skip lot field update in UpdatePanel)
+    UpdatePanelExceptLots();
+    RedrawLabels();
+    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
 //| Update TP price based on current R:R ratio                       |
 //+------------------------------------------------------------------+
 void UpdateTPFromRRRatio()
@@ -894,6 +1161,9 @@ void UpdateTPFromRRRatio()
 
     // Update the TP line
     ObjectSetDouble(0, prefix + "TPLine", OBJPROP_PRICE, tpPrice);
+
+    // Persist across timeframe changes
+    SaveLinePrices();
 
     // Redraw zones and labels
     RedrawZones();
@@ -941,6 +1211,7 @@ void AdjustPrice(ENUM_CLICK_MODE priceType, double adjustment)
     }
 
     UpdateRRRatioFromLines(); // Update R:R ratio based on new prices
+    SaveLinePrices(); // Persist across timeframe changes
     RedrawZones();
     RedrawLabels();
     UpdatePanel();
@@ -992,6 +1263,7 @@ void FlipDirection()
     ObjectSetDouble(0, prefix + "TPLine", OBJPROP_PRICE, tpPrice);
 
     UpdateRRRatioFromLines(); // Update R:R ratio (should stay the same, but recalculate to be safe)
+    SaveLinePrices(); // Persist across timeframe changes
     RedrawZones();
     RedrawLabels();
     UpdatePanel();
@@ -1374,8 +1646,15 @@ string GetRetcodeDescription(uint retcode)
 void CreateEntryLine()
 {
     string name = prefix + "EntryLine";
-    ObjectCreate(0, name, OBJ_HLINE, 0, 0, entryPrice);
-    ObjectSetInteger(0, name, OBJPROP_COLOR, EntryColor);
+    if (ObjectFind(0, name) < 0)
+    {
+        ObjectCreate(0, name, OBJ_HLINE, 0, 0, entryPrice);
+    }
+    else
+    {
+        ObjectSetDouble(0, name, OBJPROP_PRICE, entryPrice);
+    }
+    ObjectSetInteger(0, name, OBJPROP_COLOR, clrAccentEntry);
     ObjectSetInteger(0, name, OBJPROP_WIDTH, LineWidth + 1);
     ObjectSetInteger(0, name, OBJPROP_STYLE, LineStyle);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
@@ -1391,8 +1670,15 @@ void CreateEntryLine()
 void CreateSLLine()
 {
     string name = prefix + "SLLine";
-    ObjectCreate(0, name, OBJ_HLINE, 0, 0, slPrice);
-    ObjectSetInteger(0, name, OBJPROP_COLOR, StopLossColor);
+    if (ObjectFind(0, name) < 0)
+    {
+        ObjectCreate(0, name, OBJ_HLINE, 0, 0, slPrice);
+    }
+    else
+    {
+        ObjectSetDouble(0, name, OBJPROP_PRICE, slPrice);
+    }
+    ObjectSetInteger(0, name, OBJPROP_COLOR, clrAccentSell);
     ObjectSetInteger(0, name, OBJPROP_WIDTH, LineWidth + 1);
     ObjectSetInteger(0, name, OBJPROP_STYLE, LineStyle);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
@@ -1408,8 +1694,15 @@ void CreateSLLine()
 void CreateTPLine()
 {
     string name = prefix + "TPLine";
-    ObjectCreate(0, name, OBJ_HLINE, 0, 0, tpPrice);
-    ObjectSetInteger(0, name, OBJPROP_COLOR, TakeProfitColor);
+    if (ObjectFind(0, name) < 0)
+    {
+        ObjectCreate(0, name, OBJ_HLINE, 0, 0, tpPrice);
+    }
+    else
+    {
+        ObjectSetDouble(0, name, OBJPROP_PRICE, tpPrice);
+    }
+    ObjectSetInteger(0, name, OBJPROP_COLOR, clrAccentBuy);
     ObjectSetInteger(0, name, OBJPROP_WIDTH, LineWidth + 1);
     ObjectSetInteger(0, name, OBJPROP_STYLE, LineStyle);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
@@ -1429,9 +1722,12 @@ void CreateRiskZone()
     datetime timeRight = TimeCurrent() + PeriodSeconds(PERIOD_CURRENT) * 20;
 
     // Blend color with background for transparency effect
-    color blendedColor = BlendColorWithBackground(RiskZoneColor, ZoneOpacity);
+    color blendedColor = BlendColorWithBackground(clrAccentSell, ZoneOpacity);
 
-    ObjectCreate(0, name, OBJ_RECTANGLE, 0, timeLeft, entryPrice, timeRight, slPrice);
+    if (ObjectFind(0, name) < 0)
+    {
+        ObjectCreate(0, name, OBJ_RECTANGLE, 0, timeLeft, entryPrice, timeRight, slPrice);
+    }
     ObjectSetInteger(0, name, OBJPROP_COLOR, blendedColor);
     ObjectSetInteger(0, name, OBJPROP_FILL, true);
     ObjectSetInteger(0, name, OBJPROP_BACK, true);
@@ -1448,9 +1744,12 @@ void CreateRewardZone()
     datetime timeRight = TimeCurrent() + PeriodSeconds(PERIOD_CURRENT) * 20;
 
     // Blend color with background for transparency effect
-    color blendedColor = BlendColorWithBackground(RewardZoneColor, ZoneOpacity);
+    color blendedColor = BlendColorWithBackground(clrAccentBuy, ZoneOpacity);
 
-    ObjectCreate(0, name, OBJ_RECTANGLE, 0, timeLeft, entryPrice, timeRight, tpPrice);
+    if (ObjectFind(0, name) < 0)
+    {
+        ObjectCreate(0, name, OBJ_RECTANGLE, 0, timeLeft, entryPrice, timeRight, tpPrice);
+    }
     ObjectSetInteger(0, name, OBJPROP_COLOR, blendedColor);
     ObjectSetInteger(0, name, OBJPROP_FILL, true);
     ObjectSetInteger(0, name, OBJPROP_BACK, true);
@@ -1497,13 +1796,13 @@ color BlendColorWithBackground(color foreground, int opacityPercent)
 void CreatePriceLabels()
 {
     // Entry price label with background
-    CreateLineLabelWithBackground("EntryLabel", entryPrice, EntryColor, "ENTRY");
+    CreateLineLabelWithBackground("EntryLabel", entryPrice, clrAccentEntry, "ENTRY");
 
     // SL price label with background
-    CreateLineLabelWithBackground("SLLabel", slPrice, StopLossColor, "SL");
+    CreateLineLabelWithBackground("SLLabel", slPrice, clrAccentSell, "SL");
 
     // TP price label with background
-    CreateLineLabelWithBackground("TPLabel", tpPrice, TakeProfitColor, "TP");
+    CreateLineLabelWithBackground("TPLabel", tpPrice, clrAccentBuy, "TP");
 }
 
 //+------------------------------------------------------------------+
@@ -1535,7 +1834,10 @@ void CreateLineLabelWithBackground(string id, double price, color clr, string la
     ChartTimePriceToXY(0, 0, labelTime, price, tempX, y);
 
     // Use OBJ_EDIT as a read-only label with proper background (best alignment)
-    ObjectCreate(0, name, OBJ_EDIT, 0, 0, 0);
+    if (ObjectFind(0, name) < 0)
+    {
+        ObjectCreate(0, name, OBJ_EDIT, 0, 0, 0);
+    }
     ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
     ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y - textHeight / 2);
     ObjectSetInteger(0, name, OBJPROP_XSIZE, textWidth);
@@ -1558,11 +1860,12 @@ void CreateLineLabelWithBackground(string id, double price, color clr, string la
 //+------------------------------------------------------------------+
 void CreatePanel()
 {
-    int btnSize = 22;
-    int smallBtnW = 28;
-    int labelCol = 10;      // Left column for labels
-    int valueCol = 90;      // Right column for values (aligned)
-    int editCol = 50;       // Column for edit fields
+    int btnSize = 24;
+    int smallBtnW = 26;
+    int labelCol = 12;
+    int valueCol = 80;
+    int editWidth = 90;
+    int rowHeight = 28;
 
     // Panel background
     string bgName = prefix + "PanelBg";
@@ -1571,119 +1874,149 @@ void CreatePanel()
     ObjectSetInteger(0, bgName, OBJPROP_YDISTANCE, currentPanelY);
     ObjectSetInteger(0, bgName, OBJPROP_XSIZE, panelWidth);
     ObjectSetInteger(0, bgName, OBJPROP_YSIZE, panelHeight);
-    ObjectSetInteger(0, bgName, OBJPROP_BGCOLOR, PanelBgColor);
-    ObjectSetInteger(0, bgName, OBJPROP_BORDER_COLOR, PanelBorderColor);
+    ObjectSetInteger(0, bgName, OBJPROP_BGCOLOR, clrPanelBg);
+    ObjectSetInteger(0, bgName, OBJPROP_BORDER_COLOR, clrPanelBorder);
     ObjectSetInteger(0, bgName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
     ObjectSetInteger(0, bgName, OBJPROP_CORNER, PanelCorner);
     ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
     ObjectSetInteger(0, bgName, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, bgName, OBJPROP_ZORDER, 9999);
 
-    // Create labels
-    int y = 8;
-    // Use simple drag handle indicator (triple bar, widely supported)
-    CreatePanelLabel("Title", labelCol, y, ":: " + InstanceName + " R:R", clrGold, FontSize+2);
+    int y = 0;
 
-    // Minimize button (top-right corner)
-    CreatePanelButton("BtnMinimize", panelWidth - 28, 5, 22, 18, C'60,60,60', clrGray, clrWhite, "_");
+    // === HEADER BAR ===
+    CreatePanelRect("HeaderBg", 0, y, panelWidth, 28, clrHeaderBg);
+    CreatePanelLabel("Title", labelCol, y + 6, "≡ " + InstanceName, clrHeaderText, FontSize + 1);
 
-    y += 25;
+    // Theme toggle button (L=Light, D=Dark - shows what you'll switch TO)
+    string themeIcon = (currentTheme == THEME_LIGHT) ? "D" : "L";
+    CreatePanelButton("BtnTheme", panelWidth - 56, y + 4, 22, 20, clrHeaderBg, clrHeaderBg, clrHeaderText, themeIcon);
 
-    // Direction row with clickable LONG/SHORT button and PIPS/PRICE toggle
-    CreatePanelLabel("Direction", labelCol, y, "Direction:", TextColor, FontSize);
-    CreatePanelButton("BtnDirection", 75, y - 2, 55, btnSize, C'20,60,20', clrLimeGreen, clrLimeGreen, "LONG");
-    CreatePanelButton("BtnToggleDisplay", panelWidth - 55, y - 2, 50, btnSize, C'50,50,50', clrCyan, clrCyan, "PIPS");
+    // Minimize button
+    CreatePanelButton("BtnMinimize", panelWidth - 30, y + 4, 22, 20, clrHeaderBg, clrHeaderBg, clrHeaderText, "—");
 
-    y += 26;
+    y += 32;
 
-    // Entry row with editable field and +/- buttons
-    CreatePanelLabel("Entry", labelCol, y, "Entry:", TextColor, FontSize);
-    CreatePanelEdit("EditEntry", 75, y - 2, 95, btnSize, EntryColor, "0.00000");
-    CreatePanelButton("BtnEntryMinus", panelWidth - 65, y - 2, smallBtnW, btnSize, C'30,30,80', EntryColor, EntryColor, "-");
-    CreatePanelButton("BtnEntryPlus", panelWidth - 35, y - 2, smallBtnW, btnSize, C'30,30,80', EntryColor, EntryColor, "+");
+    // === DIRECTION & DISPLAY MODE ===
+    CreatePanelLabel("Direction", labelCol, y + 4, "Direction", clrTextSecondary, FontSize);
+    CreatePanelButton("BtnDirection", valueCol, y, 60, btnSize, clrAccentBuy, clrAccentBuy, clrWhite, "LONG");
+    CreatePanelButton("BtnToggleDisplay", panelWidth - 60, y, 48, btnSize, clrBtnBg, clrBtnBorder, clrTextPrimary, "PIPS");
 
-    y += 28;
+    y += rowHeight + 4;
 
-    // SL row with editable field and +/- buttons
-    CreatePanelLabel("SL", labelCol, y, "SL:", TextColor, FontSize);
-    CreatePanelEdit("EditSL", 75, y - 2, 95, btnSize, StopLossColor, "0.00000");
-    CreatePanelButton("BtnSLMinus", panelWidth - 65, y - 2, smallBtnW, btnSize, C'80,30,30', StopLossColor, StopLossColor, "-");
-    CreatePanelButton("BtnSLPlus", panelWidth - 35, y - 2, smallBtnW, btnSize, C'80,30,30', StopLossColor, StopLossColor, "+");
+    // === PRICE SECTION ===
+    CreatePanelRect("PriceSection", 6, y, panelWidth - 18, 95, clrSectionBg);
 
-    y += 28;
+    y += 8;
 
-    // TP row with editable field and +/- buttons
-    CreatePanelLabel("TP", labelCol, y, "TP:", TextColor, FontSize);
-    CreatePanelEdit("EditTP", 75, y - 2, 95, btnSize, TakeProfitColor, "0.00000");
-    CreatePanelButton("BtnTPMinus", panelWidth - 65, y - 2, smallBtnW, btnSize, C'30,80,30', TakeProfitColor, TakeProfitColor, "-");
-    CreatePanelButton("BtnTPPlus", panelWidth - 35, y - 2, smallBtnW, btnSize, C'30,80,30', TakeProfitColor, TakeProfitColor, "+");
+    // Entry
+    CreatePanelLabel("Entry", labelCol, y + 4, "Entry", clrTextSecondary, FontSize);
+    CreatePanelEdit("EditEntry", valueCol, y, editWidth, btnSize, clrAccentEntry, "0.00000");
+    CreatePanelButton("BtnEntryMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentEntry, clrAccentEntry, "−");
+    CreatePanelButton("BtnEntryPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentEntry, clrAccentEntry, "+");
 
-    y += 28;
-    CreatePanelLabel("Sep1", labelCol, y, "--------------------------------", clrGray, FontSize - 2);
+    y += rowHeight;
 
-    y += 18;
+    // Stop Loss
+    CreatePanelLabel("SL", labelCol, y + 4, "Stop Loss", clrTextSecondary, FontSize);
+    CreatePanelEdit("EditSL", valueCol, y, editWidth, btnSize, clrAccentSell, "0.00000");
+    CreatePanelButton("BtnSLMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentSell, clrAccentSell, "−");
+    CreatePanelButton("BtnSLPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentSell, clrAccentSell, "+");
 
-    // Risk % row with editable field and +/- buttons (0.1% increments)
-    CreatePanelLabel("RiskPct", labelCol, y, "Risk:", TextColor, FontSize);
-    CreatePanelEdit("EditRisk", valueCol, y - 2, 70, btnSize, clrOrange, "1.0%");
-    CreatePanelButton("BtnRiskMinus", panelWidth - 65, y - 2, smallBtnW, btnSize, C'80,60,30', clrOrange, clrOrange, "-");
-    CreatePanelButton("BtnRiskPlus", panelWidth - 35, y - 2, smallBtnW, btnSize, C'80,60,30', clrOrange, clrOrange, "+");
+    y += rowHeight;
 
-    y += 28;
+    // Take Profit
+    CreatePanelLabel("TP", labelCol, y + 4, "Take Profit", clrTextSecondary, FontSize);
+    CreatePanelEdit("EditTP", valueCol, y, editWidth, btnSize, clrAccentBuy, "0.00000");
+    CreatePanelButton("BtnTPMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentBuy, clrAccentBuy, "−");
+    CreatePanelButton("BtnTPPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentBuy, clrAccentBuy, "+");
 
-    // Risk $
-    CreatePanelLabel("Risk", labelCol, y, "Risk $:", TextColor, FontSize);
-    CreatePanelLabel("RiskVal", valueCol, y, "$0.00", StopLossColor, FontSize);
+    y += rowHeight + 12;
 
-    y += 20;
+    // === RISK SECTION ===
+    CreatePanelRect("RiskSection", 6, y, panelWidth - 18, 118, clrSectionBg);
 
-    // Reward $
-    CreatePanelLabel("Reward", labelCol, y, "Reward $:", TextColor, FontSize);
-    CreatePanelLabel("RewardVal", valueCol, y, "$0.00", TakeProfitColor, FontSize);
+    y += 8;
 
-    y += 22;
+    // Risk %
+    CreatePanelLabel("RiskPct", labelCol, y + 4, "Risk", clrTextSecondary, FontSize);
+    CreatePanelEdit("EditRisk", valueCol, y, 70, btnSize, clrAccentWarning, "1.0%");
+    CreatePanelButton("BtnRiskMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "−");
+    CreatePanelButton("BtnRiskPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "+");
 
-    // R:R Ratio with editable field and +/- buttons
-    CreatePanelLabel("RRRatio", labelCol, y, "R:R Ratio:", TextColor, FontSize);
-    CreatePanelLabel("RRPrefix", valueCol, y, "1 :", clrGold, FontSize);
-    CreatePanelEdit("EditRR", valueCol + 25, y - 2, 50, btnSize, clrGold, "2.0");
-    CreatePanelButton("BtnRRMinus", panelWidth - 65, y - 2, smallBtnW, btnSize, C'80,80,30', clrGold, clrGold, "-");
-    CreatePanelButton("BtnRRPlus", panelWidth - 35, y - 2, smallBtnW, btnSize, C'80,80,30', clrGold, clrGold, "+");
+    y += rowHeight;
 
-    y += 26;
-    CreatePanelLabel("Sep2", labelCol, y, "--------------------------------", clrGray, FontSize - 2);
-
-    y += 18;
-
-    // Lot Size
-    CreatePanelLabel("Lots", labelCol, y, "Lot Size:", TextColor, FontSize);
-    CreatePanelLabel("LotsVal", valueCol, y, "0.00", clrGold, FontSize);
+    // Risk $ and Reward $ on same line
+    CreatePanelLabel("Risk", labelCol, y + 4, "Risk $", clrTextSecondary, FontSize);
+    CreatePanelLabel("RiskVal", valueCol - 10, y + 4, "$0.00", clrAccentSell, FontSize);
+    CreatePanelLabel("Reward", 135, y + 4, "Reward $", clrTextSecondary, FontSize);
+    CreatePanelLabel("RewardVal", 195, y + 4, "$0.00", clrAccentBuy, FontSize);
 
     y += 24;
 
-    // Mode
-    CreatePanelLabel("RiskMode", labelCol, y, "Mode:", TextColor, FontSize);
-    CreatePanelLabel("RiskModeVal", valueCol, y, "% Balance", TextColor, FontSize);
+    // R:R Ratio
+    CreatePanelLabel("RRRatio", labelCol, y + 4, "R:R Ratio", clrTextSecondary, FontSize);
+    CreatePanelLabel("RRPrefix", valueCol, y + 4, "1 :", clrAccentGold, FontSize);
+    CreatePanelEdit("EditRR", valueCol + 28, y, 48, btnSize, clrAccentGold, "2.0");
+    CreatePanelButton("BtnRRMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
+    CreatePanelButton("BtnRRPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
 
-    y += 22;
+    y += rowHeight + 12;
 
-    // Order Type (auto-detected)
-    CreatePanelLabel("OrderType", labelCol, y, "Order:", TextColor, FontSize);
-    CreatePanelLabel("OrderTypeVal", valueCol, y, "BUY LIMIT", clrGold, FontSize);
+    // === LOT SIZE & INFO ===
+    CreatePanelRect("LotSection", 6, y, panelWidth - 18, 72, clrSectionBg);
 
-    y += 26;
+    y += 8;
 
-    // Execute button - places pending order at entry price
-    CreatePanelButton("BtnExecute", 10, y, panelWidth - 20, 25, clrDarkGreen, clrLimeGreen, clrWhite, "PLACE ORDER");
+    // Lot Size
+    CreatePanelLabel("Lots", labelCol, y + 4, "Lot Size", clrTextSecondary, FontSize);
+    CreatePanelEdit("EditLots", valueCol, y, 70, btnSize, clrAccentGold, "0.00");
+    CreatePanelButton("BtnLotsMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
+    CreatePanelButton("BtnLotsPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
 
-    y += 28;
+    y += rowHeight;
 
-    // Market Order button - instant execution at current price
-    CreatePanelButton("BtnMarketOrder", 10, y, panelWidth - 20, 25, clrDarkOrange, clrOrange, clrWhite, "MARKET ORDER");
+    // Mode and Order Type on same line
+    CreatePanelLabel("RiskMode", labelCol, y + 4, "Mode:", clrTextMuted, FontSize - 1);
+    CreatePanelLabel("RiskModeVal", 50, y + 4, "% Balance", clrTextSecondary, FontSize - 1);
+    CreatePanelLabel("OrderType", 130, y + 4, "Order:", clrTextMuted, FontSize - 1);
+    CreatePanelLabel("OrderTypeVal", 168, y + 4, "BUY LIMIT", clrAccentBuy, FontSize - 1);
 
-    y += 28;
+    y += rowHeight + 8;
+
+    // === ACTION BUTTONS ===
+    // Execute button
+    CreatePanelButton("BtnExecute", 8, y, panelWidth - 16, 28, clrAccentBuy, clrAccentBuy, clrWhite, "BUY LIMIT");
+
+    y += 32;
+
+    // Market Order button
+    CreatePanelButton("BtnMarketOrder", 8, y, panelWidth - 16, 28, clrAccentWarning, clrAccentWarning, clrWhite, "MARKET BUY");
+
+    y += 32;
 
     // Reset button
-    CreatePanelButton("BtnReset", 10, y, panelWidth - 20, 25, clrDimGray, clrGray, clrWhite, "RESET");
+    CreatePanelButton("BtnReset", 8, y, panelWidth - 16, 24, clrBtnBg, clrBtnBorder, clrTextSecondary, "RESET");
+}
+
+//+------------------------------------------------------------------+
+//| Helper: Create a panel section rectangle                         |
+//+------------------------------------------------------------------+
+void CreatePanelRect(string id, int x, int y, int width, int height, color bgClr)
+{
+    string name = prefix + "Rect" + id;
+    ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, currentPanelX + x);
+    ObjectSetInteger(0, name, OBJPROP_YDISTANCE, currentPanelY + y);
+    ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
+    ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
+    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, bgClr);
+    ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+    ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, bgClr);
+    ObjectSetInteger(0, name, OBJPROP_CORNER, PanelCorner);
+    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, name, OBJPROP_ZORDER, 10000);
 }
 
 //+------------------------------------------------------------------+
@@ -1705,13 +2038,15 @@ void CreatePanelButton(string id, int x, int y, int width, int height,
     ObjectSetString(0, name, OBJPROP_TEXT, text);
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, FontSize);
     ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, name, OBJPROP_ZORDER, 10001);
 }
 
 //+------------------------------------------------------------------+
 //| Helper: Create a panel edit field                                |
 //+------------------------------------------------------------------+
 void CreatePanelEdit(string id, int x, int y, int width, int height,
-                     color textClr, string text)
+                     color accentClr, string text)
 {
     string name = prefix + id;
     ObjectCreate(0, name, OBJ_EDIT, 0, 0, 0);
@@ -1720,14 +2055,16 @@ void CreatePanelEdit(string id, int x, int y, int width, int height,
     ObjectSetInteger(0, name, OBJPROP_XSIZE, width);
     ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
     ObjectSetInteger(0, name, OBJPROP_CORNER, PanelCorner);
-    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, C'30,30,30');
-    ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, textClr);
-    ObjectSetInteger(0, name, OBJPROP_COLOR, textClr);
+    ObjectSetInteger(0, name, OBJPROP_BGCOLOR, clrInputBg);
+    ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, accentClr);
+    ObjectSetInteger(0, name, OBJPROP_COLOR, clrInputText);
     ObjectSetString(0, name, OBJPROP_TEXT, text);
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, FontSize);
     ObjectSetString(0, name, OBJPROP_FONT, "Arial");
     ObjectSetInteger(0, name, OBJPROP_ALIGN, ALIGN_CENTER);
     ObjectSetInteger(0, name, OBJPROP_READONLY, false);
+    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, name, OBJPROP_ZORDER, 10002);
 }
 
 //+------------------------------------------------------------------+
@@ -1745,6 +2082,8 @@ void CreatePanelLabel(string id, int x, int y, string text, color clr, int size)
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
     ObjectSetString(0, name, OBJPROP_FONT, "Arial");
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, name, OBJPROP_ZORDER, 10001);
 }
 
 //+------------------------------------------------------------------+
@@ -1816,12 +2155,16 @@ void RedrawLabels()
     }
     double rewardPercent = riskPercent * currentRRRatio;
 
+    // Determine decimal places for percentage display (more decimals for small values)
+    int riskDecimals = (riskPercent < 0.1) ? 3 : (riskPercent < 1.0) ? 2 : 1;
+    int rewardDecimals = (rewardPercent < 0.1) ? 3 : (rewardPercent < 1.0) ? 2 : 1;
+
     // SL label with pips and risk %
-    string slText = " SL: " + DoubleToString(slPrice, _Digits) + " | " + DoubleToString(slPips, 1) + " pips | -" + DoubleToString(riskPercent, 1) + "% ";
+    string slText = " SL: " + DoubleToString(slPrice, _Digits) + " | " + DoubleToString(slPips, 1) + " pips | -" + DoubleToString(riskPercent, riskDecimals) + "% ";
     UpdateLineLabel("SLLabel", labelTime, slPrice, slText);
 
     // TP label with pips and reward %
-    string tpText = " TP: " + DoubleToString(tpPrice, _Digits) + " | " + DoubleToString(tpPips, 1) + " pips | +" + DoubleToString(rewardPercent, 1) + "% ";
+    string tpText = " TP: " + DoubleToString(tpPrice, _Digits) + " | " + DoubleToString(tpPips, 1) + " pips | +" + DoubleToString(rewardPercent, rewardDecimals) + "% ";
     UpdateLineLabel("TPLabel", labelTime, tpPrice, tpText);
 }
 
@@ -1868,9 +2211,9 @@ void UpdatePanel()
 
     // Direction button - update text, text color, background color, and border color
     ObjectSetString(0, prefix + "BtnDirection", OBJPROP_TEXT, isLong ? "LONG" : "SHORT");
-    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_COLOR, isLong ? clrLimeGreen : clrCrimson);
-    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_BGCOLOR, isLong ? C'20,60,20' : C'60,20,20');
-    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_BORDER_COLOR, isLong ? clrLimeGreen : clrCrimson);
+    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_COLOR, clrWhite);
+    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
 
     // Update edit fields based on display mode
     ObjectSetString(0, prefix + "EditEntry", OBJPROP_TEXT, DoubleToString(entryPrice, _Digits));
@@ -1881,8 +2224,8 @@ void UpdatePanel()
         ObjectSetString(0, prefix + "EditSL", OBJPROP_TEXT, DoubleToString(slPrice, _Digits));
         ObjectSetString(0, prefix + "EditTP", OBJPROP_TEXT, DoubleToString(tpPrice, _Digits));
         // Update labels
-        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "SL:");
-        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "TP:");
+        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "Stop Loss");
+        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "Take Profit");
     }
     else
     {
@@ -1890,18 +2233,20 @@ void UpdatePanel()
         ObjectSetString(0, prefix + "EditSL", OBJPROP_TEXT, DoubleToString(slPips, 1));
         ObjectSetString(0, prefix + "EditTP", OBJPROP_TEXT, DoubleToString(tpPips, 1));
         // Update labels to indicate pips mode
-        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "SL (pips):");
-        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "TP (pips):");
+        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "SL (pips)");
+        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "TP (pips)");
     }
 
-    // Risk % value (editable field)
+    // Risk % value (editable field) - show more decimals for small values
     if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
     {
-        ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, DoubleToString(currentRiskValue, 1) + "%");
+        int decimals = (currentRiskValue < 0.1) ? 3 : (currentRiskValue < 1.0) ? 2 : 1;
+        ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, DoubleToString(currentRiskValue, decimals) + "%");
     }
     else
     {
-        ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, "$" + DoubleToString(currentRiskValue, 0));
+        int decimals = (currentRiskValue < 1.0) ? 2 : 0;
+        ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, "$" + DoubleToString(currentRiskValue, decimals));
     }
 
     // Risk/Reward in dollars
@@ -1910,8 +2255,8 @@ void UpdatePanel()
     // Update R:R ratio edit field
     ObjectSetString(0, prefix + "EditRR", OBJPROP_TEXT, DoubleToString(currentRRRatio, 1));
 
-    // Lot size
-    ObjectSetString(0, prefix + "LblLotsVal", OBJPROP_TEXT, DoubleToString(lots, 2));
+    // Lot size (editable field)
+    ObjectSetString(0, prefix + "EditLots", OBJPROP_TEXT, DoubleToString(lots, 2));
 
     // Risk mode description
     string modeStr = "";
@@ -1938,23 +2283,107 @@ void UpdatePanel()
 
     // Color the order type based on whether it's limit/stop/market
     ENUM_ORDER_TYPE orderType = GetSmartOrderType();
-    color orderTypeColor = clrGold;
-    if (orderType == ORDER_TYPE_BUY_LIMIT || orderType == ORDER_TYPE_SELL_LIMIT)
-        orderTypeColor = clrDodgerBlue;
-    else if (orderType == ORDER_TYPE_BUY_STOP || orderType == ORDER_TYPE_SELL_STOP)
-        orderTypeColor = clrOrange;
-    else
-        orderTypeColor = clrLimeGreen; // Market order
+    color orderTypeColor = isLong ? clrAccentBuy : clrAccentSell;
     ObjectSetInteger(0, prefix + "LblOrderTypeVal", OBJPROP_COLOR, orderTypeColor);
 
     // Update execute button color and text based on direction and order type
-    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrDarkGreen : clrDarkRed);
-    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrLimeGreen : clrCrimson);
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
     ObjectSetString(0, prefix + "BtnExecute", OBJPROP_TEXT, orderTypeStr);
 
     // Update market order button color based on direction
-    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, isLong ? C'0,100,50' : C'100,50,0');
-    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, isLong ? clrLimeGreen : clrCrimson);
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, clrAccentWarning);
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, clrAccentWarning);
+    ObjectSetString(0, prefix + "BtnMarketOrder", OBJPROP_TEXT, isLong ? "MARKET BUY" : "MARKET SELL");
+}
+
+//+------------------------------------------------------------------+
+//| Update panel except lot size (used when manually adjusting lots) |
+//+------------------------------------------------------------------+
+void UpdatePanelExceptLots()
+{
+    bool isLong = IsLongPosition();
+    double riskAmt = GetRiskAmount();
+    double rewardAmt = CalculateRewardAmount();
+    double slPips = GetPipsDistance(entryPrice, slPrice);
+    double tpPips = GetPipsDistance(entryPrice, tpPrice);
+
+    // Direction button
+    ObjectSetString(0, prefix + "BtnDirection", OBJPROP_TEXT, isLong ? "LONG" : "SHORT");
+    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_COLOR, clrWhite);
+    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetInteger(0, prefix + "BtnDirection", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
+
+    // Update edit fields based on display mode
+    ObjectSetString(0, prefix + "EditEntry", OBJPROP_TEXT, DoubleToString(entryPrice, _Digits));
+
+    if (priceDisplayMode == DISPLAY_ABSOLUTE_PRICE)
+    {
+        ObjectSetString(0, prefix + "EditSL", OBJPROP_TEXT, DoubleToString(slPrice, _Digits));
+        ObjectSetString(0, prefix + "EditTP", OBJPROP_TEXT, DoubleToString(tpPrice, _Digits));
+        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "Stop Loss");
+        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "Take Profit");
+    }
+    else
+    {
+        ObjectSetString(0, prefix + "EditSL", OBJPROP_TEXT, DoubleToString(slPips, 1));
+        ObjectSetString(0, prefix + "EditTP", OBJPROP_TEXT, DoubleToString(tpPips, 1));
+        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "SL (pips)");
+        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "TP (pips)");
+    }
+
+    // Risk % value - show more decimals for small values
+    if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+    {
+        int decimals = (currentRiskValue < 0.1) ? 3 : (currentRiskValue < 1.0) ? 2 : 1;
+        ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, DoubleToString(currentRiskValue, decimals) + "%");
+    }
+    else
+    {
+        int decimals = (currentRiskValue < 1.0) ? 2 : 0;
+        ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, "$" + DoubleToString(currentRiskValue, decimals));
+    }
+
+    // Risk/Reward in dollars
+    ObjectSetString(0, prefix + "LblRiskVal", OBJPROP_TEXT, "$" + DoubleToString(riskAmt, 2));
+    ObjectSetString(0, prefix + "LblRewardVal", OBJPROP_TEXT, "$" + DoubleToString(rewardAmt, 2));
+    ObjectSetString(0, prefix + "EditRR", OBJPROP_TEXT, DoubleToString(currentRRRatio, 1));
+
+    // NOTE: Lot size field is NOT updated here - preserves manually entered value
+
+    // Risk mode description
+    string modeStr = "";
+    switch (RiskMode)
+    {
+    case RISK_FIXED_CASH_BALANCE:
+        modeStr = "$ Fixed (Bal)";
+        break;
+    case RISK_FIXED_CASH_EQUITY:
+        modeStr = "$ Fixed (Eq)";
+        break;
+    case RISK_PERCENT_BALANCE:
+        modeStr = "% of Balance";
+        break;
+    case RISK_PERCENT_EQUITY:
+        modeStr = "% of Equity";
+        break;
+    }
+    ObjectSetString(0, prefix + "LblRiskModeVal", OBJPROP_TEXT, modeStr);
+
+    // Update order type display
+    string orderTypeStr = GetOrderTypeDescription();
+    ObjectSetString(0, prefix + "LblOrderTypeVal", OBJPROP_TEXT, orderTypeStr);
+
+    color orderTypeColor = isLong ? clrAccentBuy : clrAccentSell;
+    ObjectSetInteger(0, prefix + "LblOrderTypeVal", OBJPROP_COLOR, orderTypeColor);
+
+    // Update buttons
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetString(0, prefix + "BtnExecute", OBJPROP_TEXT, orderTypeStr);
+
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, clrAccentWarning);
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, clrAccentWarning);
     ObjectSetString(0, prefix + "BtnMarketOrder", OBJPROP_TEXT, isLong ? "MARKET BUY" : "MARKET SELL");
 }
 
@@ -2075,6 +2504,53 @@ double CalculateLotSize()
     lotSize = MathMax(minLot, MathMin(maxLot, lotSize));
 
     return NormalizeDouble(lotSize, 2);
+}
+
+//+------------------------------------------------------------------+
+//| Calculate risk value from lot size (back-calculation)            |
+//+------------------------------------------------------------------+
+void CalculateRiskFromLots(double lots)
+{
+    double slDistance = MathAbs(entryPrice - slPrice);
+
+    if (slDistance == 0 || lots <= 0)
+        return;
+
+    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+
+    if (tickValue == 0 || tickSize == 0)
+        return;
+
+    // Calculate risk amount in dollars: riskAmount = lots * (slDistance / tickSize) * tickValue
+    double riskAmount = lots * (slDistance / tickSize) * tickValue;
+
+    // Convert to risk value based on current mode
+    // No minimum constraint here - allow any value based on lot size
+    double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+
+    switch (RiskMode)
+    {
+    case RISK_FIXED_CASH_BALANCE:
+    case RISK_FIXED_CASH_EQUITY:
+        // Fixed cash mode - risk value is the dollar amount (no minimum)
+        currentRiskValue = MathMax(0.01, riskAmount);
+        break;
+    case RISK_PERCENT_BALANCE:
+        // Percent of balance mode (no minimum, max 100%)
+        if (balance > 0)
+            currentRiskValue = MathMax(0.001, MathMin(100.0, (riskAmount / balance) * 100.0));
+        break;
+    case RISK_PERCENT_EQUITY:
+        // Percent of equity mode (no minimum, max 100%)
+        if (equity > 0)
+            currentRiskValue = MathMax(0.001, MathMin(100.0, (riskAmount / equity) * 100.0));
+        break;
+    }
+
+    // Save to GlobalVariable (persists across timeframe changes)
+    GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
 }
 
 //+------------------------------------------------------------------+
@@ -2207,10 +2683,17 @@ void ResetLinesToDefault()
         tpPrice = NormalizeDouble(currentPrice - (atrValue * currentRRRatio), digits);
     }
 
-    ObjectSetDouble(0, prefix + "EntryLine", OBJPROP_PRICE, entryPrice);
-    ObjectSetDouble(0, prefix + "SLLine", OBJPROP_PRICE, slPrice);
-    ObjectSetDouble(0, prefix + "TPLine", OBJPROP_PRICE, tpPrice);
+    // Recreate lines (handles both creation and property updates)
+    CreateEntryLine();
+    CreateSLLine();
+    CreateTPLine();
 
+    // Recreate zones and labels
+    CreateRiskZone();
+    CreateRewardZone();
+    CreatePriceLabels();
+
+    SaveLinePrices(); // Persist across timeframe changes
     RedrawZones();
     RedrawLabels();
     UpdatePanel();
@@ -2251,6 +2734,7 @@ void TogglePanelMinimize()
 
     // List of panel objects to hide/show using OBJPROP_TIMEFRAMES
     string panelObjectsToToggle[] = {
+        "RectHeaderBg", "RectPriceSection", "RectRiskSection", "RectLotSection",
         "LblDirection", "BtnDirection",
         "BtnToggleDisplay",
         "LblEntry", "EditEntry",
@@ -2259,15 +2743,13 @@ void TogglePanelMinimize()
         "BtnSLMinus", "BtnSLPlus",
         "LblTP", "EditTP",
         "BtnTPMinus", "BtnTPPlus",
-        "LblSep1",
         "LblRiskPct", "EditRisk",
         "BtnRiskMinus", "BtnRiskPlus",
         "LblRisk", "LblRiskVal",
         "LblReward", "LblRewardVal",
         "LblRRRatio", "LblRRPrefix", "EditRR",
         "BtnRRMinus", "BtnRRPlus",
-        "LblSep2",
-        "LblLots", "LblLotsVal",
+        "LblLots", "EditLots", "BtnLotsMinus", "BtnLotsPlus",
         "LblRiskMode", "LblRiskModeVal",
         "LblOrderType", "LblOrderTypeVal",
         "BtnMarketOrder",
@@ -2289,7 +2771,7 @@ void TogglePanelMinimize()
     if (panelMinimized)
     {
         ObjectSetInteger(0, prefix + "PanelBg", OBJPROP_YSIZE, panelHeightMinimized);
-        ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "+");
+        ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "□");
 
         // Delete chart objects (lines, zones, labels) when minimizing
         ObjectDelete(0, prefix + "EntryLine");
