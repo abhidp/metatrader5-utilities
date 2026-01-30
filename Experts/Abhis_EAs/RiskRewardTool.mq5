@@ -113,8 +113,9 @@ color clrBtnBg;             // Button background
 color clrBtnBorder;         // Button border
 color clrBtnText;           // Button text
 color clrBtnPlusMinus;      // +/- button background
-color clrAccentBuy;         // Buy/Long accent (green)
-color clrAccentSell;        // Sell/Short accent (red)
+color clrAccentBuy;         // Buy/Long accent (green) - for MARKET BUY
+color clrAccentBuyLight;    // Light green - for BUY LIMIT/BUY STOP
+color clrAccentSell;        // Sell/Short accent (red) - for MARKET SELL
 color clrAccentEntry;       // Entry line/field accent (blue)
 color clrAccentWarning;     // Warning/Risk accent (orange)
 color clrAccentGold;        // Gold accent for R:R, lots
@@ -129,7 +130,7 @@ double currentRRRatio;
 
 // Panel dimensions
 int panelWidth = 270;
-int panelHeight = 460;
+int panelHeight = 450;
 int panelHeightMinimized = 28;
 
 // Double-click detection for panel title (milliseconds)
@@ -159,8 +160,9 @@ void InitThemeColors()
         clrBtnBorder = C'180,180,190';      // Button border
         clrBtnText = C'50,50,60';           // Button text
         clrBtnPlusMinus = C'225,225,230';   // +/- button background
-        clrAccentBuy = C'34,139,34';        // Forest green (Long)
-        clrAccentSell = C'178,34,34';       // Firebrick red (Short)
+        clrAccentBuy = C'34,139,34';        // Forest green (MARKET BUY)
+        clrAccentBuyLight = C'60,179,113';  // Medium sea green (BUY LIMIT/STOP)
+        clrAccentSell = C'178,34,34';       // Firebrick red (MARKET SELL)
         clrAccentEntry = C'30,100,180';     // Blue (Entry)
         clrAccentWarning = C'210,105,30';   // Chocolate orange (Risk)
         clrAccentGold = C'180,130,20';      // Dark gold
@@ -183,8 +185,9 @@ void InitThemeColors()
         clrBtnBorder = C'80,85,95';         // Button border
         clrBtnText = C'200,205,215';        // Light button text
         clrBtnPlusMinus = C'65,68,75';      // +/- button background
-        clrAccentBuy = C'50,205,50';        // Lime green (Long)
-        clrAccentSell = C'255,80,80';       // Bright red (Short)
+        clrAccentBuy = C'50,205,50';        // Lime green (MARKET BUY)
+        clrAccentBuyLight = C'100,220,100'; // Light lime green (BUY LIMIT/STOP)
+        clrAccentSell = C'255,80,80';       // Bright red (MARKET SELL)
         clrAccentEntry = C'65,145,255';     // Bright blue (Entry)
         clrAccentWarning = C'255,165,50';   // Orange (Risk)
         clrAccentGold = C'255,200,50';      // Bright gold
@@ -386,6 +389,19 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         return;
     }
 
+    // === Handle Chart Click - Reset line selectability when clicking outside panel ===
+    if (id == CHARTEVENT_CLICK)
+    {
+        int mouseX = (int)lparam;
+        int mouseY = (int)dparam;
+
+        // If clicking outside the panel, ensure lines are selectable
+        if (!IsMouseOverPanel(mouseX, mouseY))
+        {
+            SetLinesSelectable(true);
+        }
+    }
+
     // === Handle Mouse Move for Panel Dragging (press-and-hold style) ===
     if (id == CHARTEVENT_MOUSE_MOVE)
     {
@@ -452,6 +468,84 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 sparam == prefix + "SLLine" ||
                 sparam == prefix + "TPLine")
             {
+                // Get the new dragged price
+                double newPrice = ObjectGetDouble(0, sparam, OBJPROP_PRICE);
+                bool isLong = IsLongPosition();
+                bool isValid = true;
+
+                // Validate line positions based on direction
+                // LONG: SL < Entry < TP
+                // SHORT: TP < Entry < SL
+                if (sparam == prefix + "EntryLine")
+                {
+                    if (isLong)
+                    {
+                        // Entry must be above SL and below TP
+                        if (newPrice <= slPrice || newPrice >= tpPrice)
+                            isValid = false;
+                    }
+                    else
+                    {
+                        // Entry must be below SL and above TP
+                        if (newPrice >= slPrice || newPrice <= tpPrice)
+                            isValid = false;
+                    }
+
+                    if (!isValid)
+                    {
+                        // Revert to previous position
+                        ObjectSetDouble(0, sparam, OBJPROP_PRICE, entryPrice);
+                        ChartRedraw();
+                        return;
+                    }
+                }
+                else if (sparam == prefix + "SLLine")
+                {
+                    if (isLong)
+                    {
+                        // SL must be below Entry
+                        if (newPrice >= entryPrice)
+                            isValid = false;
+                    }
+                    else
+                    {
+                        // SL must be above Entry
+                        if (newPrice <= entryPrice)
+                            isValid = false;
+                    }
+
+                    if (!isValid)
+                    {
+                        // Revert to previous position
+                        ObjectSetDouble(0, sparam, OBJPROP_PRICE, slPrice);
+                        ChartRedraw();
+                        return;
+                    }
+                }
+                else if (sparam == prefix + "TPLine")
+                {
+                    if (isLong)
+                    {
+                        // TP must be above Entry
+                        if (newPrice <= entryPrice)
+                            isValid = false;
+                    }
+                    else
+                    {
+                        // TP must be below Entry
+                        if (newPrice >= entryPrice)
+                            isValid = false;
+                    }
+
+                    if (!isValid)
+                    {
+                        // Revert to previous position
+                        ObjectSetDouble(0, sparam, OBJPROP_PRICE, tpPrice);
+                        ChartRedraw();
+                        return;
+                    }
+                }
+
                 UpdatePricesFromLines();
                 UpdateRRRatioFromLines(); // Update R:R ratio based on new line positions
                 SaveLinePrices(); // Persist across timeframe changes
@@ -682,18 +776,18 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         }
 
         // Double-click on panel title bar area to toggle minimize
-        // Works on title label OR panel background within title bar region (top 25 pixels)
+        // Works on title label, header background rect, or panel background within title bar region
         bool isTitleBarClick = false;
 
-        if (sparam == prefix + "LblTitle")
+        if (sparam == prefix + "LblTitle" || sparam == prefix + "RectHeaderBg")
         {
             isTitleBarClick = true;
         }
         else if (sparam == prefix + "PanelBg")
         {
-            // Check if click is within title bar region (top 25 pixels of panel)
+            // Check if click is within title bar region (top 28 pixels of panel)
             int clickY = (int)dparam;
-            if (clickY >= currentPanelY && clickY <= currentPanelY + 25)
+            if (clickY >= currentPanelY && clickY <= currentPanelY + 28)
             {
                 isTitleBarClick = true;
             }
@@ -882,9 +976,6 @@ bool IsMouseOverPanel(int x, int y)
 //+------------------------------------------------------------------+
 void SetLinesSelectable(bool selectable)
 {
-    if (linesSelectable == selectable)
-        return; // No change needed
-
     linesSelectable = selectable;
 
     // Only modify lines if they exist (panel is expanded)
@@ -896,10 +987,10 @@ void SetLinesSelectable(bool selectable)
             if (ObjectFind(0, lineNames[i]) >= 0)
             {
                 ObjectSetInteger(0, lineNames[i], OBJPROP_SELECTABLE, selectable);
-                if (!selectable)
-                    ObjectSetInteger(0, lineNames[i], OBJPROP_SELECTED, false);
+                ObjectSetInteger(0, lineNames[i], OBJPROP_SELECTED, selectable);
             }
         }
+        ChartRedraw();
     }
 }
 
@@ -1258,9 +1349,13 @@ void FlipDirection()
         tpPrice = NormalizeDouble(entryPrice + tpDistance, _Digits);
     }
 
-    // Update line positions
-    ObjectSetDouble(0, prefix + "SLLine", OBJPROP_PRICE, slPrice);
-    ObjectSetDouble(0, prefix + "TPLine", OBJPROP_PRICE, tpPrice);
+    // Recreate lines to ensure proper properties (including selectability)
+    CreateEntryLine();
+    CreateSLLine();
+    CreateTPLine();
+    CreateRiskZone();
+    CreateRewardZone();
+    CreatePriceLabels();
 
     UpdateRRRatioFromLines(); // Update R:R ratio (should stay the same, but recalculate to be safe)
     SaveLinePrices(); // Persist across timeframe changes
@@ -1982,7 +2077,7 @@ void CreatePanel()
     CreatePanelLabel("OrderType", 130, y + 4, "Order:", clrTextMuted, FontSize - 1);
     CreatePanelLabel("OrderTypeVal", 168, y + 4, "BUY LIMIT", clrAccentBuy, FontSize - 1);
 
-    y += rowHeight + 8;
+    y += rowHeight + 18;
 
     // === ACTION BUTTONS ===
     // Execute button
@@ -2036,7 +2131,9 @@ void CreatePanelButton(string id, int x, int y, int width, int height,
     ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, borderClr);
     ObjectSetInteger(0, name, OBJPROP_COLOR, textClr);
     ObjectSetString(0, name, OBJPROP_TEXT, text);
-    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, FontSize);
+    // Use larger font for +/- buttons
+    int btnFontSize = (text == "+" || text == "−" || text == "-") ? FontSize + 4 : FontSize;
+    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, btnFontSize);
     ObjectSetString(0, name, OBJPROP_FONT, "Arial");
     ObjectSetInteger(0, name, OBJPROP_BACK, false);
     ObjectSetInteger(0, name, OBJPROP_ZORDER, 10001);
@@ -2287,13 +2384,15 @@ void UpdatePanel()
     ObjectSetInteger(0, prefix + "LblOrderTypeVal", OBJPROP_COLOR, orderTypeColor);
 
     // Update execute button color and text based on direction and order type
-    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
-    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
+    // BUY LIMIT/STOP = Light green, SELL LIMIT/STOP = Orange
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrAccentBuyLight : clrAccentWarning);
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuyLight : clrAccentWarning);
     ObjectSetString(0, prefix + "BtnExecute", OBJPROP_TEXT, orderTypeStr);
 
     // Update market order button color based on direction
-    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, clrAccentWarning);
-    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, clrAccentWarning);
+    // MARKET BUY = Green, MARKET SELL = Red
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
     ObjectSetString(0, prefix + "BtnMarketOrder", OBJPROP_TEXT, isLong ? "MARKET BUY" : "MARKET SELL");
 }
 
@@ -2378,12 +2477,14 @@ void UpdatePanelExceptLots()
     ObjectSetInteger(0, prefix + "LblOrderTypeVal", OBJPROP_COLOR, orderTypeColor);
 
     // Update buttons
-    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
-    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
+    // BUY LIMIT/STOP = Light green, SELL LIMIT/STOP = Orange
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BGCOLOR, isLong ? clrAccentBuyLight : clrAccentWarning);
+    ObjectSetInteger(0, prefix + "BtnExecute", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuyLight : clrAccentWarning);
     ObjectSetString(0, prefix + "BtnExecute", OBJPROP_TEXT, orderTypeStr);
 
-    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, clrAccentWarning);
-    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, clrAccentWarning);
+    // MARKET BUY = Green, MARKET SELL = Red
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BGCOLOR, isLong ? clrAccentBuy : clrAccentSell);
+    ObjectSetInteger(0, prefix + "BtnMarketOrder", OBJPROP_BORDER_COLOR, isLong ? clrAccentBuy : clrAccentSell);
     ObjectSetString(0, prefix + "BtnMarketOrder", OBJPROP_TEXT, isLong ? "MARKET BUY" : "MARKET SELL");
 }
 
@@ -2733,8 +2834,9 @@ void TogglePanelMinimize()
     GlobalVariableSet(prefix + "Minimized", panelMinimized ? 1.0 : 0.0);
 
     // List of panel objects to hide/show using OBJPROP_TIMEFRAMES
+    // Note: RectHeaderBg is NOT included - it should always be visible
     string panelObjectsToToggle[] = {
-        "RectHeaderBg", "RectPriceSection", "RectRiskSection", "RectLotSection",
+        "RectPriceSection", "RectRiskSection", "RectLotSection",
         "LblDirection", "BtnDirection",
         "BtnToggleDisplay",
         "LblEntry", "EditEntry",
