@@ -144,13 +144,27 @@ string GetTimeframeText()
    {
       switch(tf)
       {
-         case PERIOD_M1: return "1m";
-         case PERIOD_M5: return "5m";
+         case PERIOD_M1:  return "1m";
+         case PERIOD_M2:  return "2m";
+         case PERIOD_M3:  return "3m";
+         case PERIOD_M4:  return "4m";
+         case PERIOD_M5:  return "5m";
+         case PERIOD_M6:  return "6m";
+         case PERIOD_M10: return "10m";
+         case PERIOD_M12: return "12m";
          case PERIOD_M15: return "15m";
+         case PERIOD_M20: return "20m";
          case PERIOD_M30: return "30m";
-         case PERIOD_H1: return "1H";
-         case PERIOD_H4: return "4H";
-         case PERIOD_D1: return "1D";
+         case PERIOD_H1:  return "1H";
+         case PERIOD_H2:  return "2H";
+         case PERIOD_H3:  return "3H";
+         case PERIOD_H4:  return "4H";
+         case PERIOD_H6:  return "6H";
+         case PERIOD_H8:  return "8H";
+         case PERIOD_H12: return "12H";
+         case PERIOD_D1:  return "1D";
+         case PERIOD_W1:  return "1W";
+         case PERIOD_MN1: return "1M";
          default: return string(PeriodSeconds(tf)/60) + "m";
       }
    }
