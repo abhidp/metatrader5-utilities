@@ -19,7 +19,9 @@
       "Bash(powershell -NoProfile -Command \"Get-ChildItem ''C:/Users/abhid/Documents/Projects/metatrader5-utilities/Experts/Abhis_EAs/*.ex5'' | Select-Object Name,LastWriteTime\")",
       "Bash(powershell -NoProfile -Command:*)",
       "Bash(.compile.bat \"Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\")",
-      "Bash(cmd /c \"\"\"C:/Program Files/Vantage Australia MT5 Terminal/MetaEditor64.exe\"\" /compile:\"\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\"\" /log:\"\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\build_log.txt\"\"\")"
+      "Bash(cmd /c \"\"\"C:/Program Files/Vantage Australia MT5 Terminal/MetaEditor64.exe\"\" /compile:\"\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\Experts\\\\Abhis_EAs\\\\RiskRewardTool.mq5\"\" /log:\"\"C:\\\\Users\\\\abhid\\\\Documents\\\\Projects\\\\metatrader5-utilities\\\\build_log.txt\"\"\")",
+      "Bash(cmd /c:*)",
+      "Bash(powershell -Command:*)"
     ]
   }
 }

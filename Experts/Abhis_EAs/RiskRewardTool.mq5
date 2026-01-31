@@ -1103,8 +1103,9 @@ void RecreatePanel()
 void ApplyMinimizedState()
 {
     // List of panel objects to hide when minimized
+    // Note: RectHeaderBg is NOT included - it should always be visible
     string panelObjectsToHide[] = {
-        "RectHeaderBg", "RectPriceSection", "RectRiskSection", "RectLotSection",
+        "RectPriceSection", "RectRiskSection", "RectLotSection",
         "LblDirection", "BtnDirection",
         "BtnToggleDisplay",
         "LblEntry", "EditEntry",
@@ -2887,10 +2888,7 @@ void TogglePanelMinimize()
     }
     else
     {
-        ObjectSetInteger(0, prefix + "PanelBg", OBJPROP_YSIZE, panelHeight);
-        ObjectSetString(0, prefix + "BtnMinimize", OBJPROP_TEXT, "_");
-
-        // Recreate chart objects when maximizing
+        // First recreate chart objects (lines, zones, labels) - these go behind panel
         CreateEntryLine();
         CreateSLLine();
         CreateTPLine();
@@ -2898,10 +2896,26 @@ void TogglePanelMinimize()
         CreateRewardZone();
         CreatePriceLabels();
 
+        // Delete ALL panel objects to force them to be recreated on top
+        // This includes all objects in panelObjectsToToggle plus header objects
+        ObjectDelete(0, prefix + "PanelBg");
+        ObjectDelete(0, prefix + "RectHeaderBg");
+        ObjectDelete(0, prefix + "LblTitle");
+        ObjectDelete(0, prefix + "BtnMinimize");
+        ObjectDelete(0, prefix + "BtnTheme");
+        for (int j = 0; j < numPanelObjects; j++)
+        {
+            ObjectDelete(0, prefix + panelObjectsToToggle[j]);
+        }
+
+        // Recreate entire panel - this puts all panel objects on top of lines
+        CreatePanel();
+
         // Update positions and redraw
         RedrawZones();
         RedrawLabels();
         UpdatePanel();
+        ChartRedraw();
     }
 }
 //+------------------------------------------------------------------+
