@@ -46,9 +46,11 @@ enum ENUM_PANEL_THEME
 //+------------------------------------------------------------------+
 
 // === Risk Settings ===
-input group "Risk Settings" input ENUM_RISK_MODE RiskMode = RISK_PERCENT_BALANCE; // Risk Mode
-input double RiskValue = 1.0;                                                     // Risk Value ($ or %)
-input double DefaultRRRatio = 2.0;                                                // Default Risk:Reward Ratio
+input group "Risk Settings"
+input ENUM_RISK_MODE RiskMode = RISK_PERCENT_BALANCE; // Default Risk Mode
+input double RiskPercent = 1.0;                       // Default Risk % (for % modes)
+input double RiskFixedAmount = 10.0;                  // Default Risk $ (for Fixed $ mode)
+input double DefaultRRRatio = 2.0;                    // Default Risk:Reward Ratio
 
 // === Order Settings ===
 input group "Order Settings"
@@ -125,12 +127,15 @@ color clrHeaderText;        // Header text color
 // Dynamic risk value (can be adjusted from panel)
 double currentRiskValue;
 
+// Dynamic risk mode (can be toggled from panel)
+ENUM_RISK_MODE currentRiskMode;
+
 // Dynamic R:R ratio (can be adjusted from panel)
 double currentRRRatio;
 
 // Panel dimensions
 int panelWidth = 270;
-int panelHeight = 450;
+int panelHeight = 440;
 int panelHeightMinimized = 28;
 
 // Double-click detection for panel title (milliseconds)
@@ -213,6 +218,75 @@ void ToggleTheme()
 }
 
 //+------------------------------------------------------------------+
+//| Cycle through risk modes: % Balance -> % Equity -> Fixed $       |
+//+------------------------------------------------------------------+
+void CycleRiskMode()
+{
+    // Cycle through the 3 main modes (skip RISK_FIXED_CASH_EQUITY for simplicity)
+    switch (currentRiskMode)
+    {
+    case RISK_PERCENT_BALANCE:
+        currentRiskMode = RISK_PERCENT_EQUITY;
+        break;
+    case RISK_PERCENT_EQUITY:
+        currentRiskMode = RISK_FIXED_CASH_BALANCE;
+        break;
+    case RISK_FIXED_CASH_BALANCE:
+    case RISK_FIXED_CASH_EQUITY:
+    default:
+        currentRiskMode = RISK_PERCENT_BALANCE;
+        break;
+    }
+
+    // Reset risk value to the default for the new mode
+    currentRiskValue = GetDefaultRiskValue(currentRiskMode);
+
+    // Save to GlobalVariables (persist across timeframe changes)
+    GlobalVariableSet(prefix + "RiskMode", (double)currentRiskMode);
+    GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
+
+    // Update panel to reflect new mode
+    UpdatePanel();
+    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Get display string for current risk mode                         |
+//+------------------------------------------------------------------+
+string GetRiskModeString()
+{
+    switch (currentRiskMode)
+    {
+    case RISK_FIXED_CASH_BALANCE:
+    case RISK_FIXED_CASH_EQUITY:
+        return "Fixed $";
+    case RISK_PERCENT_BALANCE:
+        return "% Balance";
+    case RISK_PERCENT_EQUITY:
+        return "% Equity";
+    default:
+        return "% Balance";
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Get default risk value for a given mode                          |
+//+------------------------------------------------------------------+
+double GetDefaultRiskValue(ENUM_RISK_MODE mode)
+{
+    switch (mode)
+    {
+    case RISK_FIXED_CASH_BALANCE:
+    case RISK_FIXED_CASH_EQUITY:
+        return RiskFixedAmount;  // Default $ amount from input
+    case RISK_PERCENT_BALANCE:
+    case RISK_PERCENT_EQUITY:
+    default:
+        return RiskPercent;      // Default % from input
+    }
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -251,12 +325,19 @@ int OnInit()
         currentPanelY = PanelY;
     }
 
-    // Restore risk value from GlobalVariable or use default
+    // Restore risk mode from GlobalVariable or use input default (must be before risk value)
+    string gvRiskMode = prefix + "RiskMode";
+    if (GlobalVariableCheck(gvRiskMode))
+        currentRiskMode = (ENUM_RISK_MODE)(int)GlobalVariableGet(gvRiskMode);
+    else
+        currentRiskMode = RiskMode;
+
+    // Restore risk value from GlobalVariable or use mode-aware default
     string gvRiskValue = prefix + "RiskValue";
     if (GlobalVariableCheck(gvRiskValue))
         currentRiskValue = GlobalVariableGet(gvRiskValue);
     else
-        currentRiskValue = RiskValue;
+        currentRiskValue = GetDefaultRiskValue(currentRiskMode);
 
     // Restore R:R ratio from GlobalVariable or use default
     string gvRRRatio = prefix + "RRRatio";
@@ -671,7 +752,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             double newRisk = StringToDouble(text);
             if (newRisk > 0)
             {
-                if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+                if (currentRiskMode == RISK_PERCENT_BALANCE || currentRiskMode == RISK_PERCENT_EQUITY)
                 {
                     currentRiskValue = MathMax(0.1, MathMin(100.0, newRisk));
                 }
@@ -688,7 +769,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             else
             {
                 // Restore the previous value if invalid
-                if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+                if (currentRiskMode == RISK_PERCENT_BALANCE || currentRiskMode == RISK_PERCENT_EQUITY)
                 {
                     ObjectSetString(0, sparam, OBJPROP_TEXT, DoubleToString(currentRiskValue, 1) + "%");
                 }
@@ -775,6 +856,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             return;
         }
 
+        // Risk mode cycle button
+        if (sparam == prefix + "BtnRiskMode")
+        {
+            CycleRiskMode();
+            ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+            return;
+        }
+
         // Double-click on panel title bar area to toggle minimize
         // Works on title label, header background rect, or panel background within title bar region
         bool isTitleBarClick = false;
@@ -810,16 +899,18 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         }
 
         // === Risk +/- Buttons ===
+        // Use $1 step for Fixed $ mode, 0.1% step for % modes
+        double riskStep = (currentRiskMode == RISK_FIXED_CASH_BALANCE || currentRiskMode == RISK_FIXED_CASH_EQUITY) ? 1.0 : 0.1;
         if (sparam == prefix + "BtnRiskPlus")
         {
-            AdjustRisk(0.1); // Increase by 0.1%
+            AdjustRisk(riskStep);
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             ChartRedraw();
             return;
         }
         if (sparam == prefix + "BtnRiskMinus")
         {
-            AdjustRisk(-0.1); // Decrease by 0.1%
+            AdjustRisk(-riskStep);
             ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
             ChartRedraw();
             return;
@@ -1121,7 +1212,7 @@ void ApplyMinimizedState()
         "LblRRRatio", "LblRRPrefix", "EditRR",
         "BtnRRMinus", "BtnRRPlus",
         "LblLots", "EditLots", "BtnLotsMinus", "BtnLotsPlus",
-        "LblRiskMode", "LblRiskModeVal",
+        "BtnRiskMode",
         "LblOrderType", "LblOrderTypeVal",
         "BtnMarketOrder",
         "BtnExecute",
@@ -1161,7 +1252,7 @@ void AdjustRisk(double adjustment)
     currentRiskValue += adjustment;
 
     // Clamp to valid range
-    if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+    if (currentRiskMode == RISK_PERCENT_BALANCE || currentRiskMode == RISK_PERCENT_EQUITY)
     {
         currentRiskValue = MathMax(0.1, MathMin(100.0, currentRiskValue)); // 0.1% to 100%
     }
@@ -2001,7 +2092,7 @@ void CreatePanel()
     y += rowHeight + 4;
 
     // === PRICE SECTION ===
-    CreatePanelRect("PriceSection", 6, y, panelWidth - 18, 95, clrSectionBg);
+    CreatePanelRect("PriceSection", 6, y, panelWidth - 12, 95, clrSectionBg);
 
     y += 8;
 
@@ -2030,13 +2121,14 @@ void CreatePanel()
     y += rowHeight + 12;
 
     // === RISK SECTION ===
-    CreatePanelRect("RiskSection", 6, y, panelWidth - 18, 118, clrSectionBg);
+    CreatePanelRect("RiskSection", 6, y, panelWidth - 12, 95, clrSectionBg);
 
     y += 8;
 
-    // Risk %
+    // Risk: [Mode Button] [Value] [-] [+]
     CreatePanelLabel("RiskPct", labelCol, y + 4, "Risk", clrTextSecondary, FontSize);
-    CreatePanelEdit("EditRisk", valueCol, y, 70, btnSize, clrAccentWarning, "1.0%");
+    CreatePanelButton("BtnRiskMode", 40, y, 68, btnSize, clrBtnBg, clrBtnBorder, clrTextPrimary, "% Balance");
+    CreatePanelEdit("EditRisk", 114, y, 60, btnSize, clrAccentWarning, "1.0%");
     CreatePanelButton("BtnRiskMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "−");
     CreatePanelButton("BtnRiskPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "+");
 
@@ -2057,10 +2149,10 @@ void CreatePanel()
     CreatePanelButton("BtnRRMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
     CreatePanelButton("BtnRRPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
 
-    y += rowHeight + 12;
+    y += rowHeight + 16;
 
     // === LOT SIZE & INFO ===
-    CreatePanelRect("LotSection", 6, y, panelWidth - 18, 72, clrSectionBg);
+    CreatePanelRect("LotSection", 6, y, panelWidth - 12, 62, clrSectionBg);
 
     y += 8;
 
@@ -2072,27 +2164,25 @@ void CreatePanel()
 
     y += rowHeight;
 
-    // Mode and Order Type on same line
-    CreatePanelLabel("RiskMode", labelCol, y + 4, "Mode:", clrTextMuted, FontSize - 1);
-    CreatePanelLabel("RiskModeVal", 50, y + 4, "% Balance", clrTextSecondary, FontSize - 1);
-    CreatePanelLabel("OrderType", 130, y + 4, "Order:", clrTextMuted, FontSize - 1);
-    CreatePanelLabel("OrderTypeVal", 168, y + 4, "BUY LIMIT", clrAccentBuy, FontSize - 1);
+    // Order Type display
+    CreatePanelLabel("OrderType", labelCol, y + 4, "Order:", clrTextMuted, FontSize - 1);
+    CreatePanelLabel("OrderTypeVal", 50, y + 4, "BUY LIMIT", clrAccentBuy, FontSize - 1);
 
-    y += rowHeight + 18;
+    y += rowHeight + 8;
 
-    // === ACTION BUTTONS ===
+    // === ACTION BUTTONS === (same x and width as section boxes)
     // Execute button
-    CreatePanelButton("BtnExecute", 8, y, panelWidth - 16, 28, clrAccentBuy, clrAccentBuy, clrWhite, "BUY LIMIT");
+    CreatePanelButton("BtnExecute", 6, y, panelWidth - 12, 28, clrAccentBuy, clrAccentBuy, clrWhite, "BUY LIMIT");
 
     y += 32;
 
     // Market Order button
-    CreatePanelButton("BtnMarketOrder", 8, y, panelWidth - 16, 28, clrAccentWarning, clrAccentWarning, clrWhite, "MARKET BUY");
+    CreatePanelButton("BtnMarketOrder", 6, y, panelWidth - 12, 28, clrAccentWarning, clrAccentWarning, clrWhite, "MARKET BUY");
 
     y += 32;
 
     // Reset button
-    CreatePanelButton("BtnReset", 8, y, panelWidth - 16, 24, clrBtnBg, clrBtnBorder, clrTextSecondary, "RESET");
+    CreatePanelButton("BtnReset", 6, y, panelWidth - 12, 24, clrBtnBg, clrBtnBorder, clrTextSecondary, "RESET");
 }
 
 //+------------------------------------------------------------------+
@@ -2241,7 +2331,7 @@ void RedrawLabels()
 
     // Calculate risk percentage (for display)
     double riskPercent;
-    if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+    if (currentRiskMode == RISK_PERCENT_BALANCE || currentRiskMode == RISK_PERCENT_EQUITY)
     {
         riskPercent = currentRiskValue;
     }
@@ -2337,7 +2427,7 @@ void UpdatePanel()
     }
 
     // Risk % value (editable field) - show more decimals for small values
-    if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+    if (currentRiskMode == RISK_PERCENT_BALANCE || currentRiskMode == RISK_PERCENT_EQUITY)
     {
         int decimals = (currentRiskValue < 0.1) ? 3 : (currentRiskValue < 1.0) ? 2 : 1;
         ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, DoubleToString(currentRiskValue, decimals) + "%");
@@ -2357,24 +2447,8 @@ void UpdatePanel()
     // Lot size (editable field)
     ObjectSetString(0, prefix + "EditLots", OBJPROP_TEXT, DoubleToString(lots, 2));
 
-    // Risk mode description
-    string modeStr = "";
-    switch (RiskMode)
-    {
-    case RISK_FIXED_CASH_BALANCE:
-        modeStr = "$ Fixed (Bal)";
-        break;
-    case RISK_FIXED_CASH_EQUITY:
-        modeStr = "$ Fixed (Eq)";
-        break;
-    case RISK_PERCENT_BALANCE:
-        modeStr = "% of Balance";
-        break;
-    case RISK_PERCENT_EQUITY:
-        modeStr = "% of Equity";
-        break;
-    }
-    ObjectSetString(0, prefix + "LblRiskModeVal", OBJPROP_TEXT, modeStr);
+    // Risk mode button text
+    ObjectSetString(0, prefix + "BtnRiskMode", OBJPROP_TEXT, GetRiskModeString());
 
     // Update order type display
     string orderTypeStr = GetOrderTypeDescription();
@@ -2434,7 +2508,7 @@ void UpdatePanelExceptLots()
     }
 
     // Risk % value - show more decimals for small values
-    if (RiskMode == RISK_PERCENT_BALANCE || RiskMode == RISK_PERCENT_EQUITY)
+    if (currentRiskMode == RISK_PERCENT_BALANCE || currentRiskMode == RISK_PERCENT_EQUITY)
     {
         int decimals = (currentRiskValue < 0.1) ? 3 : (currentRiskValue < 1.0) ? 2 : 1;
         ObjectSetString(0, prefix + "EditRisk", OBJPROP_TEXT, DoubleToString(currentRiskValue, decimals) + "%");
@@ -2452,24 +2526,8 @@ void UpdatePanelExceptLots()
 
     // NOTE: Lot size field is NOT updated here - preserves manually entered value
 
-    // Risk mode description
-    string modeStr = "";
-    switch (RiskMode)
-    {
-    case RISK_FIXED_CASH_BALANCE:
-        modeStr = "$ Fixed (Bal)";
-        break;
-    case RISK_FIXED_CASH_EQUITY:
-        modeStr = "$ Fixed (Eq)";
-        break;
-    case RISK_PERCENT_BALANCE:
-        modeStr = "% of Balance";
-        break;
-    case RISK_PERCENT_EQUITY:
-        modeStr = "% of Equity";
-        break;
-    }
-    ObjectSetString(0, prefix + "LblRiskModeVal", OBJPROP_TEXT, modeStr);
+    // Risk mode button text
+    ObjectSetString(0, prefix + "BtnRiskMode", OBJPROP_TEXT, GetRiskModeString());
 
     // Update order type display
     string orderTypeStr = GetOrderTypeDescription();
@@ -2582,21 +2640,35 @@ double CalculateLotSize()
     double riskAmount = GetRiskAmount();
     double slDistance = MathAbs(entryPrice - slPrice);
 
-    if (slDistance == 0)
+    if (slDistance == 0 || riskAmount == 0)
         return 0;
 
-    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+    // Use OrderCalcProfit for accurate calculation across all instruments
+    // This handles contract sizes, tick values, and currency conversions correctly
+    bool isLong = IsLongPosition();
+    ENUM_ORDER_TYPE orderType = isLong ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
 
-    if (tickValue == 0 || tickSize == 0)
+    // Calculate profit/loss for 1 lot at SL price
+    double profitFor1Lot = 0;
+    if (!OrderCalcProfit(orderType, _Symbol, 1.0, entryPrice, slPrice, profitFor1Lot))
+    {
+        // Fallback to tick-based calculation if OrderCalcProfit fails
+        double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+        double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+
+        if (tickValue == 0 || tickSize == 0)
+            return 0;
+
+        profitFor1Lot = -((slDistance / tickSize) * tickValue);
+    }
+
+    // profitFor1Lot is negative (it's a loss), so we use its absolute value
+    double lossPerLot = MathAbs(profitFor1Lot);
+
+    if (lossPerLot == 0)
         return 0;
 
-    double riskPerLot = (slDistance / tickSize) * tickValue;
-
-    if (riskPerLot == 0)
-        return 0;
-
-    double lotSize = riskAmount / riskPerLot;
+    double lotSize = riskAmount / lossPerLot;
 
     // Normalize to broker requirements
     double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
@@ -2619,21 +2691,32 @@ void CalculateRiskFromLots(double lots)
     if (slDistance == 0 || lots <= 0)
         return;
 
-    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+    // Use OrderCalcProfit for accurate calculation across all instruments
+    bool isLong = IsLongPosition();
+    ENUM_ORDER_TYPE orderType = isLong ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
 
-    if (tickValue == 0 || tickSize == 0)
-        return;
+    double profitForLots = 0;
+    if (!OrderCalcProfit(orderType, _Symbol, lots, entryPrice, slPrice, profitForLots))
+    {
+        // Fallback to tick-based calculation if OrderCalcProfit fails
+        double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+        double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
 
-    // Calculate risk amount in dollars: riskAmount = lots * (slDistance / tickSize) * tickValue
-    double riskAmount = lots * (slDistance / tickSize) * tickValue;
+        if (tickValue == 0 || tickSize == 0)
+            return;
+
+        profitForLots = -(lots * (slDistance / tickSize) * tickValue);
+    }
+
+    // profitForLots is negative (it's a loss), so we use its absolute value
+    double riskAmount = MathAbs(profitForLots);
 
     // Convert to risk value based on current mode
     // No minimum constraint here - allow any value based on lot size
     double balance = AccountInfoDouble(ACCOUNT_BALANCE);
     double equity = AccountInfoDouble(ACCOUNT_EQUITY);
 
-    switch (RiskMode)
+    switch (currentRiskMode)
     {
     case RISK_FIXED_CASH_BALANCE:
     case RISK_FIXED_CASH_EQUITY:
@@ -2664,7 +2747,7 @@ double GetRiskAmount()
     double balance = AccountInfoDouble(ACCOUNT_BALANCE);
     double equity = AccountInfoDouble(ACCOUNT_EQUITY);
 
-    switch (RiskMode)
+    switch (currentRiskMode)
     {
     case RISK_FIXED_CASH_BALANCE:
     case RISK_FIXED_CASH_EQUITY:
@@ -2682,15 +2765,10 @@ double GetRiskAmount()
 //+------------------------------------------------------------------+
 double CalculateRewardAmount()
 {
-    double lots = CalculateLotSize();
-    double tpDistance = MathAbs(tpPrice - entryPrice);
-    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
-
-    if (tickSize == 0 || lots == 0)
-        return 0;
-
-    return (tpDistance / tickSize) * tickValue * lots;
+    // Reward = Risk × RR Ratio (mathematically correct for all modes)
+    double riskAmt = GetRiskAmount();
+    double rrRatio = CalculateRRRatio();
+    return riskAmt * rrRatio;
 }
 
 //+------------------------------------------------------------------+
@@ -2763,8 +2841,8 @@ void ResetLinesToDefault()
     // Preserve current direction (LONG or SHORT)
     bool wasLong = IsLongPosition();
 
-    // Reset risk value to default from inputs
-    currentRiskValue = RiskValue;
+    // Reset risk value to mode-aware default from inputs
+    currentRiskValue = GetDefaultRiskValue(currentRiskMode);
     GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
 
     // Reset R:R ratio to default value from inputs
@@ -2854,7 +2932,7 @@ void TogglePanelMinimize()
         "LblRRRatio", "LblRRPrefix", "EditRR",
         "BtnRRMinus", "BtnRRPlus",
         "LblLots", "EditLots", "BtnLotsMinus", "BtnLotsPlus",
-        "LblRiskMode", "LblRiskModeVal",
+        "BtnRiskMode",
         "LblOrderType", "LblOrderTypeVal",
         "BtnMarketOrder",
         "BtnExecute",
