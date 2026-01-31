@@ -56,7 +56,6 @@ input double DefaultRRRatio = 2.0;                    // Default Risk:Reward Rat
 input group "Order Settings"
 input bool ShowConfirmation = true;   // Show Confirmation Dialog
 input int Slippage = 10;              // Slippage (points)
-input string InstanceName = "RR1";    // Instance Name (for multiple charts)
 
 // === Visual Settings ===
 input group "Visual Settings"
@@ -74,7 +73,8 @@ input int PanelY = 50;                                                          
 //+------------------------------------------------------------------+
 //| Global Variables                                                 |
 //+------------------------------------------------------------------+
-string prefix;     // Unique prefix for all objects
+string InstanceName; // Dynamic instance name (RR:SYMBOL:TF)
+string prefix;       // Unique prefix for all objects
 double entryPrice; // Current entry price
 double slPrice;    // Current stop loss price
 double tpPrice;    // Current take profit price
@@ -134,7 +134,7 @@ ENUM_RISK_MODE currentRiskMode;
 double currentRRRatio;
 
 // Panel dimensions
-int panelWidth = 270;
+int panelWidth = 250;
 int panelHeight = 440;
 int panelHeightMinimized = 28;
 
@@ -287,11 +287,45 @@ double GetDefaultRiskValue(ENUM_RISK_MODE mode)
 }
 
 //+------------------------------------------------------------------+
+//| Get timeframe as short string (H4, M15, D1, etc.)                |
+//+------------------------------------------------------------------+
+string GetTimeframeString()
+{
+    ENUM_TIMEFRAMES tf = Period();
+    switch(tf)
+    {
+        case PERIOD_M1:  return "M1";
+        case PERIOD_M2:  return "M2";
+        case PERIOD_M3:  return "M3";
+        case PERIOD_M4:  return "M4";
+        case PERIOD_M5:  return "M5";
+        case PERIOD_M6:  return "M6";
+        case PERIOD_M10: return "M10";
+        case PERIOD_M12: return "M12";
+        case PERIOD_M15: return "M15";
+        case PERIOD_M20: return "M20";
+        case PERIOD_M30: return "M30";
+        case PERIOD_H1:  return "H1";
+        case PERIOD_H2:  return "H2";
+        case PERIOD_H3:  return "H3";
+        case PERIOD_H4:  return "H4";
+        case PERIOD_H6:  return "H6";
+        case PERIOD_H8:  return "H8";
+        case PERIOD_H12: return "H12";
+        case PERIOD_D1:  return "D1";
+        case PERIOD_W1:  return "W1";
+        case PERIOD_MN1: return "MN";
+        default: return EnumToString(tf);
+    }
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-    // Set unique prefix for this instance
+    // Set dynamic instance name based on symbol and timeframe
+    InstanceName = "RR:" + _Symbol + ":" + GetTimeframeString();
     prefix = InstanceName + "_";
 
     // Restore theme from GlobalVariable or use input default
@@ -2099,24 +2133,24 @@ void CreatePanel()
     // Entry
     CreatePanelLabel("Entry", labelCol, y + 4, "Entry", clrTextSecondary, FontSize);
     CreatePanelEdit("EditEntry", valueCol, y, editWidth, btnSize, clrAccentEntry, "0.00000");
-    CreatePanelButton("BtnEntryMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentEntry, clrAccentEntry, "−");
-    CreatePanelButton("BtnEntryPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentEntry, clrAccentEntry, "+");
+    CreatePanelButton("BtnEntryMinus", panelWidth - 70, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentEntry, clrAccentEntry, "−");
+    CreatePanelButton("BtnEntryPlus", panelWidth - 42, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentEntry, clrAccentEntry, "+");
 
     y += rowHeight;
 
     // Stop Loss
-    CreatePanelLabel("SL", labelCol, y + 4, "Stop Loss", clrTextSecondary, FontSize);
+    CreatePanelLabel("SL", labelCol, y + 4, "SL", clrTextSecondary, FontSize);
     CreatePanelEdit("EditSL", valueCol, y, editWidth, btnSize, clrAccentSell, "0.00000");
-    CreatePanelButton("BtnSLMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentSell, clrAccentSell, "−");
-    CreatePanelButton("BtnSLPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentSell, clrAccentSell, "+");
+    CreatePanelButton("BtnSLMinus", panelWidth - 70, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentSell, clrAccentSell, "−");
+    CreatePanelButton("BtnSLPlus", panelWidth - 42, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentSell, clrAccentSell, "+");
 
     y += rowHeight;
 
     // Take Profit
-    CreatePanelLabel("TP", labelCol, y + 4, "Take Profit", clrTextSecondary, FontSize);
+    CreatePanelLabel("TP", labelCol, y + 4, "TP", clrTextSecondary, FontSize);
     CreatePanelEdit("EditTP", valueCol, y, editWidth, btnSize, clrAccentBuy, "0.00000");
-    CreatePanelButton("BtnTPMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentBuy, clrAccentBuy, "−");
-    CreatePanelButton("BtnTPPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentBuy, clrAccentBuy, "+");
+    CreatePanelButton("BtnTPMinus", panelWidth - 70, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentBuy, clrAccentBuy, "−");
+    CreatePanelButton("BtnTPPlus", panelWidth - 42, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentBuy, clrAccentBuy, "+");
 
     y += rowHeight + 12;
 
@@ -2129,16 +2163,16 @@ void CreatePanel()
     CreatePanelLabel("RiskPct", labelCol, y + 4, "Risk", clrTextSecondary, FontSize);
     CreatePanelButton("BtnRiskMode", 40, y, 68, btnSize, clrBtnBg, clrBtnBorder, clrTextPrimary, "% Balance");
     CreatePanelEdit("EditRisk", 114, y, 60, btnSize, clrAccentWarning, "1.0%");
-    CreatePanelButton("BtnRiskMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "−");
-    CreatePanelButton("BtnRiskPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "+");
+    CreatePanelButton("BtnRiskMinus", panelWidth - 70, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "−");
+    CreatePanelButton("BtnRiskPlus", panelWidth - 42, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentWarning, clrAccentWarning, "+");
 
     y += rowHeight;
 
     // Risk $ and Reward $ on same line
-    CreatePanelLabel("Risk", labelCol, y + 4, "Risk $", clrTextSecondary, FontSize);
-    CreatePanelLabel("RiskVal", valueCol - 10, y + 4, "$0.00", clrAccentSell, FontSize);
-    CreatePanelLabel("Reward", 135, y + 4, "Reward $", clrTextSecondary, FontSize);
-    CreatePanelLabel("RewardVal", 195, y + 4, "$0.00", clrAccentBuy, FontSize);
+    CreatePanelLabel("Risk", labelCol, y + 4, "Risk ", clrTextSecondary, FontSize);
+    CreatePanelLabel("RiskVal", valueCol - 35, y + 4, "$0.00", clrAccentSell, FontSize);
+    CreatePanelLabel("Reward", 120, y + 4, "Reward", clrTextSecondary, FontSize);
+    CreatePanelLabel("RewardVal", 170, y + 4, "$0.00", clrAccentBuy, FontSize);
 
     y += 24;
 
@@ -2146,8 +2180,8 @@ void CreatePanel()
     CreatePanelLabel("RRRatio", labelCol, y + 4, "R:R Ratio", clrTextSecondary, FontSize);
     CreatePanelLabel("RRPrefix", valueCol, y + 4, "1 :", clrAccentGold, FontSize);
     CreatePanelEdit("EditRR", valueCol + 28, y, 48, btnSize, clrAccentGold, "2.0");
-    CreatePanelButton("BtnRRMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
-    CreatePanelButton("BtnRRPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
+    CreatePanelButton("BtnRRMinus", panelWidth - 70, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
+    CreatePanelButton("BtnRRPlus", panelWidth - 42, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
 
     y += rowHeight + 16;
 
@@ -2159,8 +2193,8 @@ void CreatePanel()
     // Lot Size
     CreatePanelLabel("Lots", labelCol, y + 4, "Lot Size", clrTextSecondary, FontSize);
     CreatePanelEdit("EditLots", valueCol, y, 70, btnSize, clrAccentGold, "0.00");
-    CreatePanelButton("BtnLotsMinus", panelWidth - 76, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
-    CreatePanelButton("BtnLotsPlus", panelWidth - 48, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
+    CreatePanelButton("BtnLotsMinus", panelWidth - 70, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "−");
+    CreatePanelButton("BtnLotsPlus", panelWidth - 42, y, smallBtnW, btnSize, clrBtnPlusMinus, clrAccentGold, clrAccentGold, "+");
 
     y += rowHeight;
 
@@ -2327,7 +2361,6 @@ void RedrawLabels()
                    ? DoubleToString(currentRRRatio, 0)
                    : DoubleToString(currentRRRatio, 1);
     string entryText = " ENTRY: " + DoubleToString(entryPrice, _Digits) + " |  Lots: " + DoubleToString(lots, 2) + "  |  RR:" + rrStr + " ";
-    UpdateLineLabel("EntryLabel", labelTime, entryPrice, entryText);
 
     // Calculate risk percentage (for display)
     double riskPercent;
@@ -2347,25 +2380,36 @@ void RedrawLabels()
     int riskDecimals = (riskPercent < 0.1) ? 3 : (riskPercent < 1.0) ? 2 : 1;
     int rewardDecimals = (rewardPercent < 0.1) ? 3 : (rewardPercent < 1.0) ? 2 : 1;
 
-    // SL label with pips and risk %
-    string slText = " SL: " + DoubleToString(slPrice, _Digits) + " | " + DoubleToString(slPips, 1) + " pips | -" + DoubleToString(riskPercent, riskDecimals) + "% ";
-    UpdateLineLabel("SLLabel", labelTime, slPrice, slText);
+    // Get dollar amounts for display
+    double riskAmt = GetRiskAmount();
+    double rewardAmt = CalculateRewardAmount();
 
-    // TP label with pips and reward %
-    string tpText = " TP: " + DoubleToString(tpPrice, _Digits) + " | " + DoubleToString(tpPips, 1) + " pips | +" + DoubleToString(rewardPercent, rewardDecimals) + "% ";
-    UpdateLineLabel("TPLabel", labelTime, tpPrice, tpText);
+    // Build SL and TP label text
+    string slText = " SL: " + DoubleToString(slPrice, _Digits) + " | " + DoubleToString(slPips, 1) + " pips | -" + DoubleToString(riskPercent, riskDecimals) + "% | -$" + DoubleToString(riskAmt, 2) + " ";
+    string tpText = " TP: " + DoubleToString(tpPrice, _Digits) + " | " + DoubleToString(tpPips, 1) + " pips | +" + DoubleToString(rewardPercent, rewardDecimals) + "% | +$" + DoubleToString(rewardAmt, 2) + " ";
+
+    // Calculate max width of all three labels for uniform sizing
+    int entryWidth = CalculateTextWidth(entryText, "Arial Bold", FontSize) + 20;
+    int slWidth = CalculateTextWidth(slText, "Arial Bold", FontSize) + 20;
+    int tpWidth = CalculateTextWidth(tpText, "Arial Bold", FontSize) + 20;
+    int maxWidth = MathMax(entryWidth, MathMax(slWidth, tpWidth));
+
+    // Update all labels with uniform width
+    UpdateLineLabel("EntryLabel", labelTime, entryPrice, entryText, maxWidth);
+    UpdateLineLabel("SLLabel", labelTime, slPrice, slText, maxWidth);
+    UpdateLineLabel("TPLabel", labelTime, tpPrice, tpText, maxWidth);
 }
 
 //+------------------------------------------------------------------+
 //| Update line label position and text                              |
 //+------------------------------------------------------------------+
-void UpdateLineLabel(string id, datetime labelTime, double price, string text)
+void UpdateLineLabel(string id, datetime labelTime, double price, string text, int overrideWidth = 0)
 {
     string name = prefix + id;
 
-    // Fixed width for all labels (fits longest text: ENTRY with lots and R:R ratio)
-    int textWidth = 230;
+    // Calculate dynamic text width based on content, or use override if provided
     int textHeight = FontSize + 10;
+    int textWidth = (overrideWidth > 0) ? overrideWidth : CalculateTextWidth(text, "Arial Bold", FontSize) + 20;
 
     // Get chart width and position label at the extreme right edge
     int chartWidth = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
@@ -2413,8 +2457,8 @@ void UpdatePanel()
         ObjectSetString(0, prefix + "EditSL", OBJPROP_TEXT, DoubleToString(slPrice, _Digits));
         ObjectSetString(0, prefix + "EditTP", OBJPROP_TEXT, DoubleToString(tpPrice, _Digits));
         // Update labels
-        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "Stop Loss");
-        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "Take Profit");
+        ObjectSetString(0, prefix + "LblSL", OBJPROP_TEXT, "SL (price)");
+        ObjectSetString(0, prefix + "LblTP", OBJPROP_TEXT, "TP (price)");
     }
     else
     {
@@ -2783,6 +2827,25 @@ double CalculateRRRatio()
         return 0;
 
     return tpDistance / slDistance;
+}
+
+//+------------------------------------------------------------------+
+//| Calculate text width in pixels                                   |
+//+------------------------------------------------------------------+
+int CalculateTextWidth(string text, string fontName, int fontSize)
+{
+    // Set the font for measurement
+    uint flags = 0;
+    if (StringFind(fontName, "Bold") >= 0)
+        flags |= FW_BOLD;
+
+    // TextSetFont uses font size in tenths of a point (negative for pixels)
+    TextSetFont(fontName, -fontSize * 10, flags);
+
+    uint width, height;
+    TextGetSize(text, width, height);
+
+    return (int)width;
 }
 
 //+------------------------------------------------------------------+
