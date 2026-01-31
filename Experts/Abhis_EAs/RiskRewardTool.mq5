@@ -2135,7 +2135,7 @@ void CreatePanelButton(string id, int x, int y, int width, int height,
     // Use larger font for +/- buttons
     int btnFontSize = (text == "+" || text == "−" || text == "-") ? FontSize + 4 : FontSize;
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, btnFontSize);
-    ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+    ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
     ObjectSetInteger(0, name, OBJPROP_BACK, false);
     ObjectSetInteger(0, name, OBJPROP_ZORDER, 10001);
 }
@@ -2158,7 +2158,7 @@ void CreatePanelEdit(string id, int x, int y, int width, int height,
     ObjectSetInteger(0, name, OBJPROP_COLOR, clrInputText);
     ObjectSetString(0, name, OBJPROP_TEXT, text);
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, FontSize);
-    ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+    ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
     ObjectSetInteger(0, name, OBJPROP_ALIGN, ALIGN_CENTER);
     ObjectSetInteger(0, name, OBJPROP_READONLY, false);
     ObjectSetInteger(0, name, OBJPROP_BACK, false);
@@ -2178,7 +2178,7 @@ void CreatePanelLabel(string id, int x, int y, string text, color clr, int size)
     ObjectSetString(0, name, OBJPROP_TEXT, text);
     ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
-    ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+    ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
     ObjectSetInteger(0, name, OBJPROP_BACK, false);
     ObjectSetInteger(0, name, OBJPROP_ZORDER, 10001);
@@ -2291,6 +2291,7 @@ void UpdateLineLabel(string id, datetime labelTime, double price, string text)
     ObjectSetInteger(0, name, OBJPROP_XSIZE, textWidth);
     ObjectSetInteger(0, name, OBJPROP_YSIZE, textHeight);
     ObjectSetInteger(0, name, OBJPROP_FONTSIZE, FontSize);
+    ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
     ObjectSetInteger(0, name, OBJPROP_ALIGN, ALIGN_CENTER);
     ObjectSetString(0, name, OBJPROP_TEXT, text);
 }
