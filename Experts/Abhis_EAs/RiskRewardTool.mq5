@@ -80,11 +80,12 @@ input int PanelY = 100;                                                         
 //+------------------------------------------------------------------+
 //| Global Variables                                                 |
 //+------------------------------------------------------------------+
-string InstanceName; // Dynamic instance name (RR:SYMBOL:TF)
-string prefix;       // Unique prefix for all objects
-double entryPrice; // Current entry price
-double slPrice;    // Current stop loss price
-double tpPrice;    // Current take profit price
+string InstanceName;  // Dynamic instance name (RR:SYMBOL:TF)
+string prefix;        // Unique prefix for all objects (includes timeframe)
+string symbolPrefix;  // Symbol-only prefix for price persistence (excludes timeframe)
+double entryPrice;    // Current entry price
+double slPrice;       // Current stop loss price
+double tpPrice;       // Current take profit price
 
 // Line dragging state for real-time updates
 string draggingLine = "";  // Name of line currently being dragged
@@ -338,6 +339,7 @@ int OnInit()
     // Set dynamic instance name based on symbol and timeframe
     InstanceName = "RR:" + _Symbol + ":" + GetTimeframeString();
     prefix = InstanceName + "_";
+    symbolPrefix = "RR:" + _Symbol + "_";  // Timeframe-agnostic prefix for price persistence
 
     // Restore theme from GlobalVariable or use input default
     string gvTheme = prefix + "Theme";
@@ -400,9 +402,10 @@ int OnInit()
     priceIncrement = (digits == 3 || digits == 5) ? point * 10 : point;
 
     // Restore line prices from GlobalVariables (persists across timeframe changes)
-    string gvEntryPrice = prefix + "EntryPrice";
-    string gvSLPrice = prefix + "SLPrice";
-    string gvTPPrice = prefix + "TPPrice";
+    // Use symbolPrefix (without timeframe) so prices persist across all timeframes
+    string gvEntryPrice = symbolPrefix + "EntryPrice";
+    string gvSLPrice = symbolPrefix + "SLPrice";
+    string gvTPPrice = symbolPrefix + "TPPrice";
 
     if (GlobalVariableCheck(gvEntryPrice) && GlobalVariableCheck(gvSLPrice) && GlobalVariableCheck(gvTPPrice))
     {
@@ -483,10 +486,11 @@ void OnDeinit(const int reason)
         GlobalVariableDel(prefix + "IsLong");
         GlobalVariableDel(prefix + "RiskValue");
         GlobalVariableDel(prefix + "RRRatio");
-        GlobalVariableDel(prefix + "EntryPrice");
-        GlobalVariableDel(prefix + "SLPrice");
-        GlobalVariableDel(prefix + "TPPrice");
         GlobalVariableDel(prefix + "Theme");
+        // Use symbolPrefix for prices (shared across timeframes)
+        GlobalVariableDel(symbolPrefix + "EntryPrice");
+        GlobalVariableDel(symbolPrefix + "SLPrice");
+        GlobalVariableDel(symbolPrefix + "TPPrice");
     }
 
     ChartRedraw();
@@ -617,7 +621,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 ChartSetInteger(0, CHART_MOUSE_SCROLL, false); // Disable chart scrolling while dragging
             }
             // Check for line dragging (real-time updates)
-            else if (leftButtonPressed && !overPanel)
+            // Skip if mouse is over panel or price axis (to allow axis resizing)
+            else if (leftButtonPressed && !overPanel && !IsMouseOverPriceAxis(mouseX, mouseY))
             {
                 // If not already dragging a line, detect which line is near cursor
                 if (draggingLine == "")
@@ -1218,9 +1223,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 //+------------------------------------------------------------------+
 void SaveLinePrices()
 {
-    GlobalVariableSet(prefix + "EntryPrice", entryPrice);
-    GlobalVariableSet(prefix + "SLPrice", slPrice);
-    GlobalVariableSet(prefix + "TPPrice", tpPrice);
+    // Use symbolPrefix (without timeframe) so prices persist across all timeframes
+    GlobalVariableSet(symbolPrefix + "EntryPrice", entryPrice);
+    GlobalVariableSet(symbolPrefix + "SLPrice", slPrice);
+    GlobalVariableSet(symbolPrefix + "TPPrice", tpPrice);
 }
 
 //+------------------------------------------------------------------+
@@ -1231,6 +1237,28 @@ bool IsMouseOverPanel(int x, int y)
     int actualPanelHeight = panelMinimized ? panelHeightMinimized : panelHeight;
     return (x >= currentPanelX && x <= currentPanelX + panelWidth &&
             y >= currentPanelY && y <= currentPanelY + actualPanelHeight);
+}
+
+//+------------------------------------------------------------------+
+//| Check if mouse is over the price axis (right scale area)         |
+//+------------------------------------------------------------------+
+bool IsMouseOverPriceAxis(int mouseX, int mouseY)
+{
+    // Try to convert mouse coordinates to chart time/price
+    datetime tempTime;
+    double tempPrice;
+    int subWindow;
+
+    // ChartXYToTimePrice returns false if the coordinates are outside the chart area
+    // (i.e., on the price scale, time scale, or outside the window)
+    if (!ChartXYToTimePrice(0, mouseX, mouseY, subWindow, tempTime, tempPrice))
+        return true;  // Outside chart data area = likely on price axis
+
+    // Also check if we're in a subwindow (indicator window) rather than main chart
+    if (subWindow != 0)
+        return true;
+
+    return false;
 }
 
 //+------------------------------------------------------------------+
@@ -3008,8 +3036,8 @@ double GetPipSize()
 
     // Check for Gold (XAU) - traders consider 1 pip = 0.10 (10 points)
     // Use first 3 chars to handle XAUUSD, XAUUSDx, XAUUSD.r, XAUUSD+, etc.
-    string symbolPrefix = StringSubstr(_Symbol, 0, 3);
-    if (symbolPrefix == "XAU")
+    string symbolStart = StringSubstr(_Symbol, 0, 3);
+    if (symbolStart == "XAU")
     {
         return point * 10; // Gold: 1 pip = 10 points (0.10)
     }
