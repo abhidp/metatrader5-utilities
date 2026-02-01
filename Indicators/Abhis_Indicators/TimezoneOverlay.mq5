@@ -402,7 +402,7 @@ void UpdatePriceLabel(int mouseY, double price)
    ObjectSetInteger(0, bgName, OBJPROP_COLOR, PriceLabelTextColor);
    ObjectSetInteger(0, bgName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bgName, OBJPROP_WIDTH, 1);
-   ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
+   ObjectSetInteger(0, bgName, OBJPROP_BACK, true);
    ObjectSetInteger(0, bgName, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, bgName, OBJPROP_HIDDEN, true);
    ObjectSetString(0, bgName, OBJPROP_TOOLTIP, "\n");
@@ -419,7 +419,7 @@ void UpdatePriceLabel(int mouseY, double price)
    ObjectSetString(0, textName, OBJPROP_FONT, FontName);
    ObjectSetString(0, textName, OBJPROP_TEXT, priceText);
    ObjectSetInteger(0, textName, OBJPROP_ANCHOR, ANCHOR_UPPER);
-   ObjectSetInteger(0, textName, OBJPROP_BACK, false);
+   ObjectSetInteger(0, textName, OBJPROP_BACK, true);
    ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, textName, OBJPROP_HIDDEN, true);
    ObjectSetString(0, textName, OBJPROP_TOOLTIP, "\n");
