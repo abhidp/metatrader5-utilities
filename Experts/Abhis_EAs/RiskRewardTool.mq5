@@ -41,6 +41,12 @@ enum ENUM_PANEL_THEME
     THEME_LIGHT   // Light Mode
 };
 
+enum ENUM_LABEL_POSITION
+{
+    LABEL_RIGHT,  // Right Side
+    LABEL_LEFT    // Left Side
+};
+
 //+------------------------------------------------------------------+
 //| Input Parameters                                                 |
 //+------------------------------------------------------------------+
@@ -59,16 +65,17 @@ input int Slippage = 10;              // Slippage (points)
 
 // === Visual Settings ===
 input group "Visual Settings"
-input ENUM_PANEL_THEME PanelTheme = THEME_LIGHT;   // Panel Theme
-input int FontSize = 9;                            // Font Size
-input int LineWidth = 1;                           // Line Width
-input ENUM_LINE_STYLE LineStyle = STYLE_DASHDOT;  // Line Style
-input int ZoneOpacity = 10;                        // Zone Opacity (0-100%)
+input ENUM_PANEL_THEME PanelTheme = THEME_LIGHT;     // Panel Theme
+input ENUM_LABEL_POSITION LabelPosition = LABEL_RIGHT; // Label Position (Left/Right)
+input int FontSize = 9;                              // Font Size
+input int LineWidth = 1;                             // Line Width
+input ENUM_LINE_STYLE LineStyle = STYLE_DASHDOT;    // Line Style
+input int ZoneOpacity = 10;                          // Zone Opacity (0-100%)
 
 // === Panel Settings ===
 input group "Panel Settings" input ENUM_BASE_CORNER PanelCorner = CORNER_LEFT_UPPER; // Panel Corner
 input int PanelX = 20;                                                               // Panel X Offset
-input int PanelY = 50;                                                               // Panel Y Offset
+input int PanelY = 100;                                                               // Panel Y Offset
 
 //+------------------------------------------------------------------+
 //| Global Variables                                                 |
@@ -2541,9 +2548,13 @@ void UpdateLineLabel(string id, datetime labelTime, double price, string text, i
     int textHeight = FontSize + 10;
     int textWidth = (overrideWidth > 0) ? overrideWidth : CalculateTextWidth(text, "Arial Bold", FontSize) + 20;
 
-    // Get chart width and position label at the extreme right edge
+    // Get chart width and position label based on LabelPosition setting
     int chartWidth = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
-    int x = chartWidth - textWidth - 5; // 5 pixels padding from right edge
+    int x;
+    if (LabelPosition == LABEL_LEFT)
+        x = 5; // 5 pixels padding from left edge
+    else
+        x = chartWidth - textWidth - 5; // 5 pixels padding from right edge
 
     // Convert price to screen Y coordinate
     int tempX, y;
