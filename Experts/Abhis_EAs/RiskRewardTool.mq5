@@ -79,6 +79,9 @@ double entryPrice; // Current entry price
 double slPrice;    // Current stop loss price
 double tpPrice;    // Current take profit price
 
+// Line dragging state for real-time updates
+string draggingLine = "";  // Name of line currently being dragged
+
 // Click mode for placing lines
 ENUM_CLICK_MODE clickMode = CLICK_MODE_NONE;
 
@@ -245,7 +248,8 @@ void CycleRiskMode()
     GlobalVariableSet(prefix + "RiskMode", (double)currentRiskMode);
     GlobalVariableSet(prefix + "RiskValue", currentRiskValue);
 
-    // Update panel to reflect new mode
+    // Update labels and panel to reflect new mode
+    RedrawLabels();
     UpdatePanel();
     ChartRedraw();
 }
@@ -492,6 +496,40 @@ void OnTick()
 }
 
 //+------------------------------------------------------------------+
+//| Get the line closest to mouse Y position (within threshold)      |
+//+------------------------------------------------------------------+
+string GetLineNearCursor(int mouseX, int mouseY, int threshold = 10)
+{
+    string lines[3];
+    double prices[3];
+    lines[0] = prefix + "EntryLine";  prices[0] = entryPrice;
+    lines[1] = prefix + "SLLine";     prices[1] = slPrice;
+    lines[2] = prefix + "TPLine";     prices[2] = tpPrice;
+
+    string closestLine = "";
+    int minDistance = threshold + 1;
+
+    for (int i = 0; i < 3; i++)
+    {
+        // Convert line price to screen Y
+        int lineX, lineY;
+        datetime lineTime = iTime(_Symbol, PERIOD_CURRENT, 0);
+        ChartTimePriceToXY(0, 0, lineTime, prices[i], lineX, lineY);
+
+        // Calculate distance from mouse to line
+        int distance = MathAbs(mouseY - lineY);
+
+        if (distance < minDistance)
+        {
+            minDistance = distance;
+            closestLine = lines[i];
+        }
+    }
+
+    return closestLine;
+}
+
+//+------------------------------------------------------------------+
 //| ChartEvent handler                                               |
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
@@ -563,7 +601,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         }
         else
         {
-            // Not currently dragging - check if we should start
+            // Not currently dragging panel - check if we should start panel drag
             if (leftButtonPressed && IsClickOnPanelHeader(mouseX, mouseY))
             {
                 panelDragging = true;
@@ -571,10 +609,102 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 panelDragOffsetY = mouseY - currentPanelY;
                 ChartSetInteger(0, CHART_MOUSE_SCROLL, false); // Disable chart scrolling while dragging
             }
+            // Check for line dragging (real-time updates)
+            else if (leftButtonPressed && !overPanel)
+            {
+                // If not already dragging a line, detect which line is near cursor
+                if (draggingLine == "")
+                {
+                    draggingLine = GetLineNearCursor(mouseX, mouseY, 15);
+                }
+
+                // If we have a line to drag, update it
+                if (draggingLine != "")
+                {
+                    // Convert mouse Y position to price
+                    datetime tempTime;
+                    double tempPrice;
+                    int subWindow;
+                    ChartXYToTimePrice(0, mouseX, mouseY, subWindow, tempTime, tempPrice);
+
+                    // Only process if in main chart window
+                    if (subWindow == 0)
+                    {
+                        double newPrice = NormalizeDouble(tempPrice, _Digits);
+                        bool isLong = IsLongPosition();
+                        double minGap = SymbolInfoDouble(_Symbol, SYMBOL_POINT) * 10; // Minimum gap between lines
+
+                        // Validate and clamp line positions based on direction
+                        // LONG: SL < Entry < TP
+                        // SHORT: TP < Entry < SL
+                        if (draggingLine == prefix + "EntryLine")
+                        {
+                            if (isLong)
+                            {
+                                // Entry must be above SL and below TP
+                                newPrice = MathMax(newPrice, slPrice + minGap);
+                                newPrice = MathMin(newPrice, tpPrice - minGap);
+                            }
+                            else
+                            {
+                                // Entry must be below SL and above TP
+                                newPrice = MathMin(newPrice, slPrice - minGap);
+                                newPrice = MathMax(newPrice, tpPrice + minGap);
+                            }
+                            entryPrice = newPrice;
+                        }
+                        else if (draggingLine == prefix + "SLLine")
+                        {
+                            if (isLong)
+                            {
+                                // SL must be below Entry
+                                newPrice = MathMin(newPrice, entryPrice - minGap);
+                            }
+                            else
+                            {
+                                // SL must be above Entry
+                                newPrice = MathMax(newPrice, entryPrice + minGap);
+                            }
+                            slPrice = newPrice;
+                        }
+                        else if (draggingLine == prefix + "TPLine")
+                        {
+                            if (isLong)
+                            {
+                                // TP must be above Entry
+                                newPrice = MathMax(newPrice, entryPrice + minGap);
+                            }
+                            else
+                            {
+                                // TP must be below Entry
+                                newPrice = MathMin(newPrice, entryPrice - minGap);
+                            }
+                            tpPrice = newPrice;
+                        }
+
+                        // Move line to validated position
+                        ObjectSetDouble(0, draggingLine, OBJPROP_PRICE, newPrice);
+
+                        // Update R:R ratio based on new positions
+                        UpdateRRRatioFromLines();
+
+                        // Real-time updates of zones, labels, and panel
+                        RedrawZones();
+                        RedrawLabels();
+                        UpdatePanel();
+                        ChartRedraw();
+                    }
+                }
+            }
+            else if (!leftButtonPressed && draggingLine != "")
+            {
+                // Mouse released - clear dragging state
+                draggingLine = "";
+            }
         }
     }
 
-    // === Handle Line Dragging ===
+    // === Handle Line Dragging (finalize on release) ===
     if (id == CHARTEVENT_OBJECT_DRAG)
     {
         if (StringFind(sparam, prefix) == 0)
