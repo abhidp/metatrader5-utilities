@@ -42,7 +42,7 @@ if exist "%EX5_FILE%" (
     if !errorlevel! == 0 (
         echo SUCCESS: Copied to !DEST_DIR!
         echo.
-        echo Refresh Navigator in MT5 to see the EA.
+        echo Refresh Navigator in MT5 to see the changes.
     ) else (
         echo ERROR: Failed to copy file.
     )

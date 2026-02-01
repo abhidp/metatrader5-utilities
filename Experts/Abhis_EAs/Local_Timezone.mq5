@@ -18,7 +18,7 @@ input bool ShowSeconds = true;                     // Show Seconds
 input bool ShowDate = true;                        // Show Date
 
 // Global Variables
-string ObjectName = "LocalTime";
+string LabelName = "LocalTime";
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                     |
@@ -26,21 +26,24 @@ string ObjectName = "LocalTime";
 int OnInit()
 {
   // Create text object
-  if (!ObjectCreate(0, ObjectName, OBJ_LABEL, 0, 0, 0))
+  if (!ObjectCreate(0, LabelName, OBJ_LABEL, 0, 0, 0))
   {
     Print("Error creating time label object: ", GetLastError());
     return INIT_FAILED;
   }
 
   // Set object properties
-  ObjectSetInteger(0, ObjectName, OBJPROP_CORNER, Corner);
-  ObjectSetInteger(0, ObjectName, OBJPROP_XDISTANCE, XOffset);
-  ObjectSetInteger(0, ObjectName, OBJPROP_YDISTANCE, YOffset);
-  ObjectSetInteger(0, ObjectName, OBJPROP_COLOR, TimeColor);
-  ObjectSetInteger(0, ObjectName, OBJPROP_FONTSIZE, FontSize);
-  ObjectSetString(0, ObjectName, OBJPROP_FONT, FontName);
-  ObjectSetInteger(0, ObjectName, OBJPROP_SELECTABLE, false);
-  ObjectSetInteger(0, ObjectName, OBJPROP_HIDDEN, true);
+  ObjectSetInteger(0, LabelName, OBJPROP_CORNER, Corner);
+  ObjectSetInteger(0, LabelName, OBJPROP_XDISTANCE, XOffset);
+  ObjectSetInteger(0, LabelName, OBJPROP_YDISTANCE, YOffset);
+  ObjectSetInteger(0, LabelName, OBJPROP_COLOR, TimeColor);
+  ObjectSetInteger(0, LabelName, OBJPROP_FONTSIZE, FontSize);
+  ObjectSetString(0, LabelName, OBJPROP_FONT, FontName);
+  ObjectSetInteger(0, LabelName, OBJPROP_SELECTABLE, false);
+  ObjectSetInteger(0, LabelName, OBJPROP_HIDDEN, true);
+
+  // Set timer to update every second (works even when market is closed)
+  EventSetTimer(1);
 
   // Force immediate update
   UpdateTime();
@@ -53,8 +56,19 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+  // Kill timer
+  EventKillTimer();
+
   // Clean up by deleting the object
-  ObjectDelete(0, ObjectName);
+  ObjectDelete(0, LabelName);
+}
+
+//+------------------------------------------------------------------+
+//| Timer function - updates every second                             |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+  UpdateTime();
 }
 
 //+------------------------------------------------------------------+
@@ -103,7 +117,7 @@ void UpdateTime()
   timeStr += " (Local Time)";
 
   // Update the object text
-  ObjectSetString(0, ObjectName, OBJPROP_TEXT, timeStr);
+  ObjectSetString(0, LabelName, OBJPROP_TEXT, timeStr);
 
   // Redraw the chart
   ChartRedraw(0);
