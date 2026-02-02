@@ -110,9 +110,21 @@ void CalculateTimezoneOffset()
    if (TimezoneMode == TZ_LOCAL)
    {
       // Calculate offset between server time and local time
-      datetime serverTime = TimeCurrent();
+      // Use GMT as a common reference to avoid timing discrepancies
+      datetime gmtTime = TimeGMT();
       datetime localTime = TimeLocal();
-      serverToLocalOffset = (double)(localTime - serverTime);
+      double localToGMTOffset = (double)(localTime - gmtTime);
+
+      // Get server's offset from GMT
+      datetime serverTime = TimeCurrent();
+      double serverToGMTOffset = (double)(serverTime - gmtTime);
+
+      // Round both offsets to nearest minute to avoid second-level discrepancies
+      localToGMTOffset = MathRound(localToGMTOffset / 60.0) * 60.0;
+      serverToGMTOffset = MathRound(serverToGMTOffset / 60.0) * 60.0;
+
+      // Server to local = local's GMT offset - server's GMT offset
+      serverToLocalOffset = localToGMTOffset - serverToGMTOffset;
    }
    else
    {
@@ -121,6 +133,9 @@ void CalculateTimezoneOffset()
       datetime serverTime = TimeCurrent();
       datetime gmtTime = TimeGMT();
       double serverUTCOffset = (double)(serverTime - gmtTime);
+
+      // Round to nearest minute
+      serverUTCOffset = MathRound(serverUTCOffset / 60.0) * 60.0;
 
       // Calculate offset to apply: target UTC offset - server UTC offset
       serverToLocalOffset = (CustomUTCOffset * 3600) - serverUTCOffset;
@@ -565,25 +580,52 @@ void DrawTimezoneOverlay()
    // Determine label interval based on visible bars and chart width
    int labelInterval = CalculateLabelInterval(visibleBars);
 
-   // Create time labels
+   // Get period duration in seconds for calculating future times
+   int periodSeconds = PeriodSeconds(PERIOD_CURRENT);
+
+   // Get the latest bar time as reference for future calculations
+   datetime latestBarTime = iTime(_Symbol, PERIOD_CURRENT, 0);
+
+   // Calculate right margin to avoid overlapping with timezone indicator
+   // "LOCAL (UTC+10.0)" is about 17 chars, estimate width based on font size
+   int tzIndicatorWidth = ShowTimezoneLabel ? (int)(20 * FontSize * 0.6) + 30 : 50;
+   int rightMargin = tzIndicatorWidth + 20;
+
+   // Create time labels using bar 0 as anchor point
    int labelCount = 0;
    int maxLabels = 20;  // Limit number of labels for performance
+   double priceRef = iClose(_Symbol, PERIOD_CURRENT, 0);
 
-   for (int i = firstVisibleBar; i >= lastVisibleBar && labelCount < maxLabels; i -= labelInterval)
+   // First, draw current bar (bar 0) if visible - this is the anchor
+   int bar0X, bar0Y;
+   bool bar0Visible = false;
+   if (ChartTimePriceToXY(0, 0, latestBarTime, priceRef, bar0X, bar0Y))
    {
-      if (i < 0) break;
+      if (bar0X >= 50 && bar0X <= chartWidth - rightMargin)
+      {
+         datetime displayTime = latestBarTime + (int)serverToLocalOffset;
+         string timeStr = FormatTimeLabel(displayTime);
+         CreateTimeLabel(labelCount, bar0X, panelY, timeStr);
+         labelCount++;
+         bar0Visible = true;
+      }
+   }
+
+   // Draw labels for historic bars (going back from bar 0 at intervals)
+   for (int i = labelInterval; labelCount < maxLabels; i += labelInterval)
+   {
+      if (i > firstVisibleBar) break;  // Beyond visible range
 
       datetime barTime = iTime(_Symbol, PERIOD_CURRENT, i);
       if (barTime == 0) continue;
 
       // Convert bar position to screen X coordinate
       int barX, barY;
-      double price = iClose(_Symbol, PERIOD_CURRENT, i);
-      if (!ChartTimePriceToXY(0, 0, barTime, price, barX, barY))
+      if (!ChartTimePriceToXY(0, 0, barTime, priceRef, barX, barY))
          continue;
 
       // Skip if too close to edges
-      if (barX < 50 || barX > chartWidth - 50)
+      if (barX < 50 || barX > chartWidth - rightMargin)
          continue;
 
       // Calculate display time (server time + offset)
@@ -594,6 +636,35 @@ void DrawTimezoneOverlay()
 
       // Create label
       CreateTimeLabel(labelCount, barX, panelY, timeStr);
+      labelCount++;
+   }
+
+   // Draw labels for future times (going forward from bar 0 at intervals)
+   for (int futureBar = labelInterval; labelCount < maxLabels; futureBar += labelInterval)
+   {
+      datetime futureTime = latestBarTime + (futureBar * periodSeconds);
+
+      // Convert future time to screen X coordinate
+      int futureX, futureY;
+      if (!ChartTimePriceToXY(0, 0, futureTime, priceRef, futureX, futureY))
+         break;  // Can't convert, probably too far in future
+
+      // Stop if we're past the right edge (accounting for timezone indicator)
+      if (futureX > chartWidth - rightMargin)
+         break;
+
+      // Skip if too close to left edge
+      if (futureX < 50)
+         continue;
+
+      // Calculate display time (server time + offset)
+      datetime displayTime = futureTime + (int)serverToLocalOffset;
+
+      // Format time string based on timeframe
+      string timeStr = FormatTimeLabel(displayTime);
+
+      // Create label
+      CreateTimeLabel(labelCount, futureX, panelY, timeStr);
       labelCount++;
    }
 
