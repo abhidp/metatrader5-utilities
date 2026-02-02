@@ -393,8 +393,8 @@ void UpdatePriceLabel(int mouseY, double price)
    string priceText = DoubleToString(price, _Digits);
 
    // Calculate label dimensions
-   int labelWidth = (int)(StringLen(priceText) * 7) + 10;
-   int labelHeight = 16;
+   int labelWidth = (int)(StringLen(priceText) * 8) + 12;
+   int labelHeight = 20;
 
    // Position on right edge of chart area
    int labelX = chartWidth - labelWidth - 2;
@@ -428,9 +428,9 @@ void UpdatePriceLabel(int mouseY, double price)
 
    ObjectSetInteger(0, textName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetInteger(0, textName, OBJPROP_XDISTANCE, labelX + labelWidth / 2);
-   ObjectSetInteger(0, textName, OBJPROP_YDISTANCE, labelY + 2);
+   ObjectSetInteger(0, textName, OBJPROP_YDISTANCE, labelY + 3);
    ObjectSetInteger(0, textName, OBJPROP_COLOR, PriceLabelTextColor);
-   ObjectSetInteger(0, textName, OBJPROP_FONTSIZE, 8);
+   ObjectSetInteger(0, textName, OBJPROP_FONTSIZE, 10);
    ObjectSetString(0, textName, OBJPROP_FONT, FontName);
    ObjectSetString(0, textName, OBJPROP_TEXT, priceText);
    ObjectSetInteger(0, textName, OBJPROP_ANCHOR, ANCHOR_UPPER);
