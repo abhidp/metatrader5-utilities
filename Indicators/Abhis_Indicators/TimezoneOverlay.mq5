@@ -454,7 +454,7 @@ string FormatCrosshairTime(datetime time)
    // Add day name if enabled
    if (ShowDayName)
    {
-      result = dayNames[dt.day_of_week] + ", ";
+      result = dayNames[dt.day_of_week] + " ";
    }
 
    // Format date based on selected format
@@ -476,31 +476,33 @@ string FormatCrosshairTime(datetime time)
 //+------------------------------------------------------------------+
 string FormatDatePart(MqlDateTime &dt, string &monthNames[])
 {
+   int shortYear = dt.year % 100;  // 2-digit year
+
    switch (DateFormat)
    {
       case DATE_DD_MMM_YYYY:
-         return StringFormat("%02d %s %04d", dt.day, monthNames[dt.mon], dt.year);
+         return StringFormat("%d %s %02d", dt.day, monthNames[dt.mon], shortYear);
 
       case DATE_MMM_DD_YYYY:
-         return StringFormat("%s %02d, %04d", monthNames[dt.mon], dt.day, dt.year);
+         return StringFormat("%s %d, %02d", monthNames[dt.mon], dt.day, shortYear);
 
       case DATE_DD_MM_YYYY:
-         return StringFormat("%02d/%02d/%04d", dt.day, dt.mon, dt.year);
+         return StringFormat("%d/%02d/%02d", dt.day, dt.mon, shortYear);
 
       case DATE_MM_DD_YYYY:
-         return StringFormat("%02d/%02d/%04d", dt.mon, dt.day, dt.year);
+         return StringFormat("%02d/%d/%02d", dt.mon, dt.day, shortYear);
 
       case DATE_YYYY_MM_DD:
-         return StringFormat("%04d-%02d-%02d", dt.year, dt.mon, dt.day);
+         return StringFormat("%02d-%02d-%d", shortYear, dt.mon, dt.day);
 
       case DATE_DD_MMM:
-         return StringFormat("%02d %s", dt.day, monthNames[dt.mon]);
+         return StringFormat("%d %s", dt.day, monthNames[dt.mon]);
 
       case DATE_MMM_DD:
-         return StringFormat("%s %02d", monthNames[dt.mon], dt.day);
+         return StringFormat("%s %d", monthNames[dt.mon], dt.day);
 
       default:
-         return StringFormat("%02d %s %04d", dt.day, monthNames[dt.mon], dt.year);
+         return StringFormat("%d %s %02d", dt.day, monthNames[dt.mon], shortYear);
    }
 }
 
