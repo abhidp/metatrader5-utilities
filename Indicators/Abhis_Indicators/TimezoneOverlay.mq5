@@ -428,7 +428,7 @@ void UpdatePriceLabel(int mouseY, double price)
 
    ObjectSetInteger(0, textName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetInteger(0, textName, OBJPROP_XDISTANCE, labelX + labelWidth / 2);
-   ObjectSetInteger(0, textName, OBJPROP_YDISTANCE, labelY + 3);
+   ObjectSetInteger(0, textName, OBJPROP_YDISTANCE, labelY + 1);
    ObjectSetInteger(0, textName, OBJPROP_COLOR, PriceLabelTextColor);
    ObjectSetInteger(0, textName, OBJPROP_FONTSIZE, 10);
    ObjectSetString(0, textName, OBJPROP_FONT, FontName);
