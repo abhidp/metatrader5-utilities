@@ -33,6 +33,8 @@ global StartY := 0
 ; --- Configuration ---
 global HORIZONTAL_PAN_BARS := 5       ; Number of bars to pan with Shift+scroll
 global ZOOM_MULTIPLIER := 1           ; How many zoom steps per scroll tick
+global ZOOM_COOLDOWN_MS := 100        ; Minimum ms between zoom scroll events (higher = less sensitive)
+global lastZoomTick := 0
 
 ; --- Helper Function: Check if MetaTrader 5 Chart window is active ---
 IsChartWindow() {
@@ -98,7 +100,12 @@ CheckForDrag() {
 
 ; --- Scroll Wheel to Zoom (TradingView-style) ---
 WheelUp:: {
+    global lastZoomTick
     if (IsChartWindow()) {
+        now := A_TickCount
+        if (now - lastZoomTick < ZOOM_COOLDOWN_MS)
+            return
+        lastZoomTick := now
         Loop ZOOM_MULTIPLIER {
             Send "{NumpadAdd}"  ; Zoom in (larger candles, fewer bars)
         }
@@ -108,7 +115,12 @@ WheelUp:: {
 }
 
 WheelDown:: {
+    global lastZoomTick
     if (IsChartWindow()) {
+        now := A_TickCount
+        if (now - lastZoomTick < ZOOM_COOLDOWN_MS)
+            return
+        lastZoomTick := now
         Loop ZOOM_MULTIPLIER {
             Send "{NumpadSub}"  ; Zoom out (smaller candles, more bars)
         }

@@ -352,7 +352,8 @@ int OnInit()
     InitThemeColors();
 
     // Restore minimized state from GlobalVariable (persists across timeframe changes)
-    string gvMinimized = prefix + "Minimized";
+    // Use symbolPrefix (not prefix) so state persists across timeframe changes
+    string gvMinimized = symbolPrefix + "Minimized";
     if (GlobalVariableCheck(gvMinimized))
         panelMinimized = (GlobalVariableGet(gvMinimized) == 1.0);
     else
@@ -3143,7 +3144,8 @@ void TogglePanelMinimize()
     panelMinimized = !panelMinimized;
 
     // Save minimized state to GlobalVariable (persists across timeframe changes)
-    GlobalVariableSet(prefix + "Minimized", panelMinimized ? 1.0 : 0.0);
+    // Use symbolPrefix (not prefix) so state persists across timeframe changes
+    GlobalVariableSet(symbolPrefix + "Minimized", panelMinimized ? 1.0 : 0.0);
 
     // List of panel objects to hide/show using OBJPROP_TIMEFRAMES
     // Note: RectHeaderBg is NOT included - it should always be visible
